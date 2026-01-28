@@ -280,7 +280,10 @@ const getProfile = async (req, res) => {
       });
     }
 
-    res.json(person);
+    res.json({
+      ...person.toJSON(),
+      profile_picture: person.User ? person.User.profile_picture : null
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
