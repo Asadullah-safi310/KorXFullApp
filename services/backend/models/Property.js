@@ -125,7 +125,7 @@ const Property = sequelize.define('Property', {
   },
   is_unavailable: {
     type: DataTypes.BOOLEAN,
-    defaultValue: true,
+    defaultValue: false,
   },
   is_photo_available: {
     type: DataTypes.BOOLEAN,
