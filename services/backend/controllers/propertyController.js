@@ -1,5 +1,5 @@
 const { validationResult } = require('express-validator');
-const { Property, Deal, User, Person, Province, District, Area } = require('../models');
+const { Property, Deal, User, Person, Province, District, Area, ParentApartment } = require('../models');
 const { sequelize } = require('../config/db');
 const { Op } = require('sequelize');
 const path = require('path');
@@ -38,7 +38,14 @@ const createProperty = async (req, res) => {
       is_photo_available, 
       is_attachment_available, 
       is_video_available, 
-      videos 
+      videos,
+      is_parent,
+      parent_property_id,
+      apartment_id,
+      unit_number,
+      floor,
+      unit_type,
+      title
     } = req.body;
 
     // Check if owner exists (if provided)
@@ -50,6 +57,40 @@ const createProperty = async (req, res) => {
       }
     }
 
+    // Inherit location from parent if parent_property_id is provided
+    let finalLocation = location;
+    let finalAddress = address;
+    let finalProvinceId = province_id;
+    let finalDistrictId = district_id;
+    let finalAreaId = area_id;
+    let finalCity = city;
+    let finalLatitude = latitude;
+    let finalLongitude = longitude;
+
+    if (parent_property_id) {
+      const parent = await Property.findByPk(parent_property_id, { transaction });
+      if (parent) {
+        finalLocation = parent.location;
+        finalAddress = parent.address;
+        finalProvinceId = parent.province_id;
+        finalDistrictId = parent.district_id;
+        finalAreaId = parent.area_id;
+        finalCity = parent.city;
+        finalLatitude = parent.latitude;
+        finalLongitude = parent.longitude;
+      }
+    } else if (apartment_id) {
+      const apartment = await ParentApartment.findByPk(apartment_id, { transaction });
+      if (apartment) {
+        finalAddress = apartment.address;
+        finalProvinceId = apartment.province_id;
+        finalDistrictId = apartment.district_id;
+        finalAreaId = apartment.area_id;
+        finalLatitude = apartment.latitude;
+        finalLongitude = apartment.longitude;
+      }
+    }
+
     const property = await Property.create({
       owner_person_id: owner_person_id || null,
       agent_id: agent_id || null,
@@ -58,18 +99,18 @@ const createProperty = async (req, res) => {
       purpose,
       sale_price: sale_price || null,
       rent_price: rent_price || null,
-      location,
-      address,
-      province_id: province_id || null,
-      district_id: district_id || null,
-      area_id: area_id || null,
-      city,
+      location: finalLocation,
+      address: finalAddress,
+      province_id: finalProvinceId || null,
+      district_id: finalDistrictId || null,
+      area_id: finalAreaId || null,
+      city: finalCity,
       area_size,
       bedrooms,
       bathrooms,
       description,
-      latitude: latitude || null,
-      longitude: longitude || null,
+      latitude: finalLatitude || null,
+      longitude: finalLongitude || null,
       status: 'available',
       is_available_for_sale: is_available_for_sale === true || is_available_for_sale === 'true' ? true : false,
       is_available_for_rent: is_available_for_rent === true || is_available_for_rent === 'true' ? true : false,
@@ -78,6 +119,13 @@ const createProperty = async (req, res) => {
       is_attachment_available: is_attachment_available === true || is_attachment_available === 'true' ? true : false,
       is_video_available: is_video_available === true || is_video_available === 'true' ? true : false,
       videos: Array.isArray(videos) ? videos : [],
+      is_parent: is_parent === true || is_parent === 'true' ? true : false,
+      parent_property_id: parent_property_id || null,
+      apartment_id: apartment_id || null,
+      unit_number,
+      floor,
+      unit_type,
+      title
     }, { transaction });
 
     await transaction.commit();
@@ -90,9 +138,13 @@ const createProperty = async (req, res) => {
 
 const getProperties = async (req, res) => {
   try {
-    const { limit, offset } = req.query;
+    const { limit, offset, parent_property_id } = req.query;
     const where = {};
     
+    if (parent_property_id) {
+      where.parent_property_id = parent_property_id;
+    }
+
     // If not admin, filter by assigned agent or creator
     if (req.user && req.user.role !== 'admin') {
       where[Op.or] = [
@@ -113,6 +165,7 @@ const getProperties = async (req, res) => {
         { model: Province, as: 'ProvinceData', attributes: ['id', 'name'] },
         { model: District, as: 'DistrictData', attributes: ['id', 'name'] },
         { model: Area, as: 'AreaData', attributes: ['id', 'name'] },
+        { model: Property, as: 'Parent', attributes: ['property_id', 'title', 'property_type', 'address'] },
       ],
     });
 
@@ -146,6 +199,7 @@ const getPropertyById = async (req, res) => {
         { model: Province, as: 'ProvinceData', attributes: ['id', 'name'] },
         { model: District, as: 'DistrictData', attributes: ['id', 'name'] },
         { model: Area, as: 'AreaData', attributes: ['id', 'name'] },
+        { model: Property, as: 'Parent', attributes: ['property_id', 'title', 'property_type', 'address'] },
       ],
     });
 
@@ -196,10 +250,26 @@ const searchProperties = async (req, res) => {
       province_id,
       district_id,
       area_id,
+      parent_property_id,
+      is_parent,
+      search,
       limit, 
       offset 
     } = req.query;
     const andCriteria = [];
+
+    if (search) {
+      andCriteria.push({
+        [Op.or]: [
+          { title: { [Op.like]: `%${search}%` } },
+          { description: { [Op.like]: `%${search}%` } },
+          { address: { [Op.like]: `%${search}%` } },
+          { unit_number: { [Op.like]: `%${search}%` } },
+          { '$Parent.title$': { [Op.like]: `%${search}%` } },
+          { '$Parent.address$': { [Op.like]: `%${search}%` } },
+        ]
+      });
+    }
 
     const publicCriteria = { 
       [Op.or]: [
@@ -225,6 +295,8 @@ const searchProperties = async (req, res) => {
 
     if (city) andCriteria.push({ city: { [Op.like]: `%${city}%` } });
     if (property_type) andCriteria.push({ property_type });
+    if (parent_property_id) andCriteria.push({ parent_property_id });
+    if (is_parent !== undefined) andCriteria.push({ is_parent: is_parent === 'true' || is_parent === true });
     // if (purpose) andCriteria.push({ purpose }); // Purpose can be conflicting with availability
     if (province_id) andCriteria.push({ province_id });
     if (district_id) andCriteria.push({ district_id });
@@ -280,6 +352,7 @@ const searchProperties = async (req, res) => {
         { model: Province, as: 'ProvinceData', attributes: ['id', 'name'] },
         { model: District, as: 'DistrictData', attributes: ['id', 'name'] },
         { model: Area, as: 'AreaData', attributes: ['id', 'name'] },
+        { model: Property, as: 'Parent', attributes: ['property_id', 'title', 'property_type', 'address'] },
       ]
     });
 
@@ -310,7 +383,7 @@ const updateProperty = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { owner_person_id, agent_id, property_type, purpose, sale_price, rent_price, location, address, province_id, district_id, area_id, city, area_size, bedrooms, bathrooms, description, latitude, longitude, is_available_for_sale, is_available_for_rent, is_unavailable, is_photo_available, is_attachment_available, is_video_available } = req.body;
+    const { owner_person_id, agent_id, property_type, purpose, sale_price, rent_price, location, address, province_id, district_id, area_id, city, area_size, bedrooms, bathrooms, description, latitude, longitude, is_available_for_sale, is_available_for_rent, is_unavailable, is_photo_available, is_attachment_available, is_video_available, is_parent, parent_property_id, unit_number, floor, unit_type } = req.body;
 
     const property = await Property.findByPk(id);
     if (!property) {
@@ -347,6 +420,11 @@ const updateProperty = async (req, res) => {
       is_photo_available: is_photo_available === true || is_photo_available === 'true' ? true : false,
       is_attachment_available: is_attachment_available === true || is_attachment_available === 'true' ? true : false,
       is_video_available: is_video_available === true || is_video_available === 'true' ? true : false,
+      is_parent: is_parent !== undefined ? (is_parent === true || is_parent === 'true') : property.is_parent,
+      parent_property_id: parent_property_id !== undefined ? parent_property_id : property.parent_property_id,
+      unit_number: unit_number !== undefined ? unit_number : property.unit_number,
+      floor: floor !== undefined ? floor : property.floor,
+      unit_type: unit_type !== undefined ? unit_type : property.unit_type,
     });
 
     res.json({ message: 'Property updated successfully' });
@@ -842,6 +920,104 @@ const getPublicPropertiesByUser = async (req, res) => {
   }
 };
 
+const getPropertyChildren = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const children = await Property.findAll({
+      where: { parent_property_id: id },
+      order: [['createdAt', 'DESC']],
+      include: [
+        { model: Person, as: 'Owner', attributes: ['id', 'full_name', 'phone'] },
+        { model: User, as: 'Agent', attributes: ['user_id', 'full_name', 'phone', 'profile_picture'] },
+        { model: Province, as: 'ProvinceData', attributes: ['id', 'name'] },
+        { model: District, as: 'DistrictData', attributes: ['id', 'name'] },
+        { model: Area, as: 'AreaData', attributes: ['id', 'name'] },
+      ]
+    });
+
+    const enrichedChildren = children.map(prop => {
+      const propJson = prop.toJSON();
+      return {
+        ...propJson,
+        current_owner: propJson.Owner,
+        is_available_for_sale: Boolean(propJson.is_available_for_sale),
+        is_available_for_rent: Boolean(propJson.is_available_for_rent),
+        is_photo_available: Boolean(propJson.is_photo_available),
+        is_attachment_available: Boolean(propJson.is_attachment_available),
+        is_video_available: Boolean(propJson.is_video_available),
+      };
+    });
+
+    res.json(enrichedChildren);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const addChildProperty = async (req, res) => {
+  const { id } = req.params; // parent id
+  const transaction = await sequelize.transaction();
+
+  try {
+    const parent = await Property.findByPk(id, { transaction });
+    if (!parent) {
+      await transaction.rollback();
+      return res.status(404).json({ error: 'Parent property not found' });
+    }
+
+    const { 
+      property_type, 
+      purpose, 
+      sale_price, 
+      rent_price, 
+      area_size, 
+      bedrooms, 
+      bathrooms, 
+      description, 
+      is_available_for_sale, 
+      is_available_for_rent, 
+      unit_number,
+      floor,
+      unit_type
+    } = req.body;
+
+    const child = await Property.create({
+      owner_person_id: parent.owner_person_id,
+      agent_id: parent.agent_id,
+      created_by_user_id: req.user ? req.user.user_id : null,
+      property_type,
+      purpose,
+      sale_price: sale_price || null,
+      rent_price: rent_price || null,
+      location: parent.location,
+      address: parent.address,
+      province_id: parent.province_id,
+      district_id: parent.district_id,
+      area_id: parent.area_id,
+      city: parent.city,
+      area_size,
+      bedrooms,
+      bathrooms,
+      description,
+      latitude: parent.latitude,
+      longitude: parent.longitude,
+      status: 'available',
+      is_available_for_sale: is_available_for_sale === true || is_available_for_sale === 'true' ? true : false,
+      is_available_for_rent: is_available_for_rent === true || is_available_for_rent === 'true' ? true : false,
+      parent_property_id: parent.property_id,
+      unit_number,
+      floor,
+      unit_type,
+    }, { transaction });
+
+    await transaction.commit();
+    res.status(201).json({ message: 'Child property added successfully', property_id: child.property_id });
+  } catch (error) {
+    await transaction.rollback();
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   createProperty,
   getProperties,
@@ -860,4 +1036,6 @@ module.exports = {
   getPropertiesByTenant,
   updatePropertyAvailability,
   getMyProperties,
+  getPropertyChildren,
+  addChildProperty,
 };

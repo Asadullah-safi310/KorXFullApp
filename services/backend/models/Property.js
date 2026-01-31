@@ -139,6 +139,42 @@ const Property = sequelize.define('Property', {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  is_parent: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  parent_property_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'properties',
+      key: 'property_id',
+    },
+  },
+  unit_number: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+  },
+  floor: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+  },
+  unit_type: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+  },
+  title: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+  },
+  apartment_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'parent_apartments',
+      key: 'id',
+    }, 
+  }
 }, {
   tableName: 'properties',
   timestamps: true,

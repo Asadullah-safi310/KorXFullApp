@@ -13,7 +13,9 @@ const {
   getMyProperties,
   getPropertyById,
   searchProperties,
-  getDashboardStats
+  getDashboardStats,
+  addChildProperty,
+  getPropertyChildren
 } = require('../../controllers/propertyController');
 const { upload } = require('../../utils/upload');
 
@@ -21,6 +23,7 @@ router.get('/dashboard/stats', getDashboardStats);
 router.get('/search', searchProperties);
 router.get('/', getMyProperties);
 router.get('/my-properties', getMyProperties);
+router.get('/:id/children', getPropertyChildren);
 router.get('/:id', getPropertyById); // Add this route to fetch single property for editing
 
 router.post('/', [
@@ -45,6 +48,7 @@ router.put('/:id', [
 
 router.patch('/:id/status', updatePropertyStatus);
 router.put('/:id/availability', updatePropertyAvailability);
+router.post('/:id/children', addChildProperty);
 router.post('/:id/upload', upload.array('files', 10), uploadFiles);
 router.delete('/:id/file', deleteFile);
 router.delete('/:id', deleteProperty);
