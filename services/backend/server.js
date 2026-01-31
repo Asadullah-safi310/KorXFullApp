@@ -56,13 +56,16 @@ app.get('/api/health', (req, res) => {
 });
 
 // 404 handler for API routes
-app.use('/api/*', (req, res) => {
-  console.log(`404 at ${req.originalUrl} - ${req.method}`);
-  res.status(404).json({ 
-    error: 'API route not found', 
-    path: req.originalUrl, 
-    method: req.method 
-  });
+app.use((req, res) => {
+  if (req.url.startsWith('/api/')) {
+    console.log(`404 at ${req.originalUrl} - ${req.method}`);
+    return res.status(404).json({ 
+      error: 'API route not found', 
+      path: req.originalUrl, 
+      method: req.method 
+    });
+  }
+  res.status(404).send('Not Found');
 });
 
 app.use((err, req, res, next) => {
