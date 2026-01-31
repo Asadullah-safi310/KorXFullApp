@@ -71,7 +71,7 @@ exports.getUsers = async (req, res) => {
       where[Op.or] = [
         { full_name: { [Op.like]: `%${search}%` } },
         { email: { [Op.like]: `%${search}%` } },
-        { phone_number: { [Op.like]: `%${search}%` } }
+        { phone: { [Op.like]: `%${search}%` } }
       ];
     }
 
@@ -83,7 +83,7 @@ exports.getUsers = async (req, res) => {
           [
             sequelize.literal(`(
               SELECT COUNT(*)
-              FROM Properties AS p
+              FROM properties AS p
               WHERE p.agent_id = User.user_id
             )`),
             'property_count'
@@ -91,7 +91,7 @@ exports.getUsers = async (req, res) => {
           [
             sequelize.literal(`(
               SELECT COUNT(*)
-              FROM Deals AS d
+              FROM deals AS d
               WHERE d.agent_user_id = User.user_id
             )`),
             'deal_count'
@@ -99,7 +99,7 @@ exports.getUsers = async (req, res) => {
           [
             sequelize.literal(`(
               SELECT COALESCE(SUM(price), 0)
-              FROM Deals AS d
+              FROM deals AS d
               WHERE d.agent_user_id = User.user_id AND d.status = 'completed'
             )`),
             'total_volume'
@@ -180,7 +180,10 @@ exports.getAllProperties = async (req, res) => {
     if (province_id) where.province_id = province_id;
     if (district_id) where.district_id = district_id;
     if (status) where.status = status;
-    if (is_promoted !== undefined) where.is_promoted = is_promoted === 'true';
+    if (is_promoted !== undefined) {
+      // is_promoted doesn't exist in model yet, so we skip it or use a default
+      // where.is_promoted = is_promoted === 'true';
+    }
     if (agent_id) {
       if (agent_id === 'none') where.agent_id = null;
       else where.agent_id = agent_id;
@@ -193,8 +196,9 @@ exports.getAllProperties = async (req, res) => {
 
     if (search) {
       where[Op.or] = [
-        { title: { [Op.like]: `%${search}%` } },
+        { property_type: { [Op.like]: `%${search}%` } },
         { location: { [Op.like]: `%${search}%` } },
+        { address: { [Op.like]: `%${search}%` } }
       ];
     }
 

@@ -7,6 +7,7 @@ const Province = require('./Province');
 const District = require('./District');
 const Area = require('./Area');
 const OTP = require('./OTP');
+const ParentApartment = require('./ParentApartment');
 
 // --- User & Person Associations ---
 User.hasOne(Person, { foreignKey: 'user_id', as: 'PersonProfile' });
@@ -14,6 +15,13 @@ Person.belongsTo(User, { foreignKey: 'user_id', as: 'User' });
 
 User.hasMany(OTP, { foreignKey: 'user_id', as: 'OTPs' });
 OTP.belongsTo(User, { foreignKey: 'user_id', as: 'User' });
+
+// --- Apartment Associations ---
+ParentApartment.belongsTo(User, { foreignKey: 'created_by', as: 'Agent' });
+User.hasMany(ParentApartment, { foreignKey: 'created_by', as: 'ManagedApartments' });
+
+ParentApartment.hasMany(Property, { foreignKey: 'apartment_id', as: 'Units' });
+Property.belongsTo(ParentApartment, { foreignKey: 'apartment_id', as: 'Apartment' });
 
 // --- Property Associations ---
 Property.belongsTo(Person, { foreignKey: 'owner_person_id', as: 'Owner' });
@@ -30,6 +38,9 @@ Deal.belongsTo(Property, { foreignKey: 'property_id', as: 'Property' });
 
 Property.hasMany(PropertyHistory, { foreignKey: 'property_id', onDelete: 'CASCADE' });
 PropertyHistory.belongsTo(Property, { foreignKey: 'property_id', as: 'Property' });
+
+Property.hasMany(Property, { foreignKey: 'parent_property_id', as: 'Children' });
+Property.belongsTo(Property, { foreignKey: 'parent_property_id', as: 'Parent' });
 
 // --- Deal Associations ---
 Deal.belongsTo(User, { foreignKey: 'agent_user_id', as: 'Agent' });
@@ -53,6 +64,11 @@ Property.belongsTo(Province, { foreignKey: 'province_id', as: 'ProvinceData' });
 Property.belongsTo(District, { foreignKey: 'district_id', as: 'DistrictData' });
 Property.belongsTo(Area, { foreignKey: 'area_id', as: 'AreaData' });
 
+// Apartment Location Associations
+ParentApartment.belongsTo(Province, { foreignKey: 'province_id', as: 'ProvinceData' });
+ParentApartment.belongsTo(District, { foreignKey: 'district_id', as: 'DistrictData' });
+ParentApartment.belongsTo(Area, { foreignKey: 'area_id', as: 'AreaData' });
+
 // Property History Associations
 PropertyHistory.belongsTo(User, { foreignKey: 'previous_owner_id', as: 'PreviousOwner' });
 PropertyHistory.belongsTo(User, { foreignKey: 'new_owner_id', as: 'NewOwner' });
@@ -67,4 +83,5 @@ module.exports = {
   District,
   Area,
   OTP,
+  ParentApartment,
 };
