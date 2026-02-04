@@ -9,14 +9,14 @@ require('./models');
 const authRoutes = require('./routes/authRoutes');
 const publicPropertyRoutes = require('./routes/public/propertyRoutes');
 const publicUserRoutes = require('./routes/public/userRoutes');
-const publicApartmentRoutes = require('./routes/public/apartmentRoutes');
+const homeRoutes = require('./routes/public/homeRoutes');
 const protectedPropertyRoutes = require('./routes/protected/propertyRoutes');
 const protectedDealRoutes = require('./routes/protected/dealRoutes');
 const protectedProfileRoutes = require('./routes/protected/profileRoutes');
-const protectedApartmentRoutes = require('./routes/protected/apartmentRoutes');
 const personRoutes = require('./routes/personRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const parentRoutes = require('./routes/parentRoutes');
 const { protect } = require('./middleware/authMiddleware');
 
 const app = express();
@@ -32,23 +32,23 @@ app.use(cookieParser());
 
 // Request logger
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
   next();
 });
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/home', homeRoutes);
 app.use('/api/public/properties', publicPropertyRoutes);
-app.use('/api/public/users', publicUserRoutes);
-app.use('/api/public/apartments', publicApartmentRoutes);
 app.use('/api/properties', protect, protectedPropertyRoutes);
 app.use('/api/deals', protect, protectedDealRoutes);
 app.use('/api/profile', protect, protectedProfileRoutes);
-app.use('/api/apartments', protect, protectedApartmentRoutes);
 app.use('/api/persons', personRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api', parentRoutes);
 
 app.get('/api/health', (req, res) => {
   // Health check - refreshed v4 - Final attempt at 404
@@ -57,12 +57,13 @@ app.get('/api/health', (req, res) => {
 
 // 404 handler for API routes
 app.use((req, res) => {
-  if (req.url.startsWith('/api/')) {
-    console.log(`404 at ${req.originalUrl} - ${req.method}`);
+  if (req.originalUrl.startsWith('/api/')) {
+    console.log(`404 at ${req.originalUrl} - ${req.method} - No matching route found`);
     return res.status(404).json({ 
       error: 'API route not found', 
       path: req.originalUrl, 
-      method: req.method 
+      method: req.method,
+      suggestion: 'Check your route definitions and mount points in server.js'
     });
   }
   res.status(404).send('Not Found');

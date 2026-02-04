@@ -74,6 +74,8 @@ const getPersons = async (req, res) => {
           model: Property,
           as: 'OwnedProperties',
           attributes: ['property_id', 'property_type', 'city'],
+          where: { record_kind: 'listing' },
+          required: false
         },
       ],
       limit: 20,
@@ -93,6 +95,8 @@ const getPersonById = async (req, res) => {
         {
           model: Property,
           as: 'OwnedProperties',
+          where: { record_kind: 'listing' },
+          required: false
         },
         {
           model: User,

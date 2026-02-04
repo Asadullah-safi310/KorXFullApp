@@ -7,19 +7,20 @@ exports.getDashboardStats = async (req, res) => {
   try {
     const totalUsers = await User.count();
     const totalAgents = await User.count({ where: { role: 'agent' } });
-    const totalProperties = await Property.count();
-    const totalActiveListings = await Property.count({ where: { status: 'available' } });
+    const totalProperties = await Property.count({ where: { record_kind: 'listing' } });
+    const totalActiveListings = await Property.count({ where: { status: 'available', record_kind: 'listing' } });
     const totalDeals = await Deal.count();
     
     const activeDeals = await Deal.count({ where: { status: 'active' } });
     const completedDeals = await Deal.count({ where: { status: 'completed' } });
     const canceledDeals = await Deal.count({ where: { status: 'canceled' } });
 
-    const propertiesForSale = await Property.count({ where: { is_available_for_sale: true } });
-    const propertiesForRent = await Property.count({ where: { is_available_for_rent: true } });
+    const propertiesForSale = await Property.count({ where: { is_available_for_sale: true, record_kind: 'listing' } });
+    const propertiesForRent = await Property.count({ where: { is_available_for_rent: true, record_kind: 'listing' } });
 
     // Recently added properties
     const recentProperties = await Property.findAll({
+      where: { record_kind: 'listing' },
       limit: 5,
       order: [['createdAt', 'DESC']],
       include: [
@@ -84,7 +85,7 @@ exports.getUsers = async (req, res) => {
             sequelize.literal(`(
               SELECT COUNT(*)
               FROM properties AS p
-              WHERE p.agent_id = User.user_id
+              WHERE p.agent_id = User.user_id AND p.record_kind = 'listing'
             )`),
             'property_count'
           ],
@@ -175,7 +176,7 @@ exports.getAllProperties = async (req, res) => {
     
     const offset = (page - 1) * limit;
 
-    const where = {};
+    const where = { record_kind: 'listing' };
     if (city) where.city = city;
     if (province_id) where.province_id = province_id;
     if (district_id) where.district_id = district_id;
