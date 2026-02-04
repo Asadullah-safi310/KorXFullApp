@@ -38,6 +38,7 @@ const getPublicPropertyListers = async (req, res) => {
     const users = await Property.findAll({
       attributes: ['created_by_user_id'],
       where: {
+        record_kind: 'listing',
         [Op.or]: [
           { is_available_for_sale: true },
           { is_available_for_rent: true }

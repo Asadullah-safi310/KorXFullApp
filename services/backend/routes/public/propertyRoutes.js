@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const controllers = require('../../controllers/propertyController');
+console.log('PropertyController exports:', Object.keys(controllers));
+
 const { 
   getProperties, 
   getPropertyById, 
@@ -9,7 +12,7 @@ const {
   getPublicProperties,
   getPublicPropertiesByUser,
   getPropertyChildren
-} = require('../../controllers/propertyController');
+} = controllers;
 
 router.get('/public', getPublicProperties);
 router.get('/user/:id', getPublicPropertiesByUser);

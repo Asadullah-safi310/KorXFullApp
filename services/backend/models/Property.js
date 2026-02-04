@@ -23,16 +23,47 @@ const Property = sequelize.define('Property', {
     comment: 'System User who created/added the property',
   },
   status: {
-    type: DataTypes.ENUM('available', 'under_deal', 'unavailable'),
-    defaultValue: 'available',
+    type: DataTypes.ENUM('draft', 'active', 'inactive'),
+    defaultValue: 'draft',
+    allowNull: false,
+  },
+  property_category: {
+    type: DataTypes.ENUM('tower', 'market', 'sharak', 'normal'),
+    allowNull: false,
+  },
+  record_kind: {
+    type: DataTypes.ENUM('container', 'listing'),
+    defaultValue: 'listing',
+    allowNull: false,
   },
   property_type: {
-    type: DataTypes.STRING(50),
+    type: DataTypes.ENUM('house', 'shop', 'office', 'plot', 'land', 'apartment'),
     allowNull: false,
   },
-  purpose: {
-    type: DataTypes.STRING(20),
+  parent_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'properties',
+      key: 'property_id',
+    },
+  },
+  title: {
+    type: DataTypes.STRING(255),
     allowNull: false,
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  details: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'JSON object for category/type-specific fields: {planned_units, floor, apartment_no, shop_number}',
+  },
+  purpose: {
+    type: DataTypes.ENUM('sale', 'rent'),
+    allowNull: true,
   },
   sale_price: {
     type: DataTypes.DECIMAL(18, 2),
@@ -71,17 +102,13 @@ const Property = sequelize.define('Property', {
     allowNull: true,
     comment: 'Full formatted address from Google Maps',
   },
-  location: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-  },
   city: {
     type: DataTypes.STRING(100),
     allowNull: true,
   },
   area_size: {
     type: DataTypes.STRING(50),
-    allowNull: false,
+    allowNull: true,
   },
   bedrooms: {
     type: DataTypes.INTEGER,
@@ -91,10 +118,6 @@ const Property = sequelize.define('Property', {
     type: DataTypes.INTEGER,
     allowNull: true,
   },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
   latitude: {
     type: DataTypes.DECIMAL(10, 8),
     allowNull: true,
@@ -102,6 +125,11 @@ const Property = sequelize.define('Property', {
   longitude: {
     type: DataTypes.DECIMAL(11, 8),
     allowNull: true,
+  },
+  facilities: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'JSON object containing amenities like lift, parking, etc.',
   },
   photos: {
     type: DataTypes.JSON,
@@ -115,6 +143,8 @@ const Property = sequelize.define('Property', {
     type: DataTypes.JSON,
     defaultValue: [],
   },
+  // Keep these for backward compatibility if they are used in code, 
+  // but they are mostly redundant now with the new system.
   is_available_for_sale: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
@@ -146,10 +176,6 @@ const Property = sequelize.define('Property', {
   parent_property_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    references: {
-      model: 'properties',
-      key: 'property_id',
-    },
   },
   unit_number: {
     type: DataTypes.STRING(100),
@@ -158,26 +184,24 @@ const Property = sequelize.define('Property', {
   floor: {
     type: DataTypes.STRING(50),
     allowNull: true,
-  },
-  unit_type: {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-  },
-  title: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-  },
-  apartment_id: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'parent_apartments',
-      key: 'id',
-    }, 
   }
 }, {
   tableName: 'properties',
   timestamps: true,
+  indexes: [
+    {
+      fields: ['parent_id'],
+    },
+    {
+      fields: ['property_category', 'parent_id'],
+    },
+    {
+      fields: ['record_kind'],
+    },
+    {
+      fields: ['record_kind', 'status'],
+    }
+  ]
 });
 
 module.exports = Property;

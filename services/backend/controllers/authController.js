@@ -276,13 +276,37 @@ exports.login = async (req, res) => {
   try {
     const { phone, password } = req.body;
 
-    if (!phone) {
-      return res.status(400).json({ message: 'Phone number is required' });
+    if (!phone || !password) {
+      return res.status(400).json({ message: 'Phone number and password are required' });
     }
 
-    const user = await User.findOne({ where: { phone } });
+    const identifier = phone.trim();
+    console.log(`[AUTH] Login attempt for: ${identifier}`);
 
-    if (user && (await user.validatePassword(password))) {
+    // Find user by phone OR username
+    const user = await User.findOne({ 
+      where: { 
+        [Op.or]: [
+          { phone: identifier }, 
+          { username: identifier }
+        ]
+      } 
+    });
+
+    if (!user) {
+      console.log(`[AUTH] Login failed: User not found for ${identifier}`);
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    if (!user.is_active) {
+      console.log(`[AUTH] Login failed: Account inactive for ${identifier}`);
+      return res.status(403).json({ message: 'Account is inactive. Please contact support.' });
+    }
+
+    const isMatch = await user.validatePassword(password);
+    
+    if (isMatch) {
+      console.log(`[AUTH] Login successful for: ${user.username} (${user.role})`);
       const token = generateToken(user.user_id);
 
       res.cookie('jwt', token, {
@@ -301,10 +325,11 @@ exports.login = async (req, res) => {
         token,
       });
     } else {
-      res.status(401).json({ message: 'Invalid phone number or password' });
+      console.log(`[AUTH] Login failed: Incorrect password for ${identifier}`);
+      res.status(401).json({ message: 'Invalid credentials' });
     }
   } catch (error) {
-    console.error(error);
+    console.error('[AUTH] Login error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
