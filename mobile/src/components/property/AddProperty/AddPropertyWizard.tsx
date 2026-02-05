@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -6,7 +6,8 @@ import {
   ActivityIndicator, 
   Alert, 
   KeyboardAvoidingView, 
-  Platform
+  Platform,
+  Pressable
 } from 'react-native';
 import { AppText } from '../../AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,13 @@ import { observer } from 'mobx-react-lite';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
+import Animated, { 
+  useAnimatedStyle, 
+  useSharedValue, 
+  withSpring,
+  FadeIn,
+  FadeOut
+} from 'react-native-reanimated';
 
 import StepOwnership from './steps/StepOwnership';
 import StepBasicInfo from './steps/StepBasicInfo';
@@ -27,6 +35,13 @@ import { stepSchemas, initialValues } from './validationSchemas';
 import { useAddPropertyWizard } from './useAddPropertyWizard';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import propertyStore from '../../../stores/PropertyStore';
+import { 
+  wizardNextIn, 
+  wizardNextOut, 
+  wizardBackIn, 
+  wizardBackOut,
+  springConfig
+} from '../../../utils/animations';
 
 const ALL_STEPS = [
   { title: 'What are you adding?', component: StepOwnership },
@@ -44,6 +59,7 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
   const router = useRouter();
   const keyboardVerticalOffset = Platform.OS === 'ios' ? 100 : 100;
   const [loading, setLoading] = useState(false);
+  const [direction, setDirection] = useState<'next' | 'back'>('next');
   
   const {
     goToNextStep,
@@ -55,9 +71,20 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
     initialValues: formInitialValues,
   } = useAddPropertyWizard(steps.length, currentStep, setCurrentStep);
 
+  const animatedProgress = useSharedValue(progress);
+
+  useEffect(() => {
+    animatedProgress.value = withSpring(progress, springConfig);
+  }, [progress]);
+
+  const progressBarStyle = useAnimatedStyle(() => ({
+    width: `${animatedProgress.value}%`,
+  }));
+
   const ActiveComponent = steps[currentStep].component;
 
   const handleSubmitListing = async () => {
+    // ... logic remains unchanged
     try {
       setLoading(true);
       
@@ -146,8 +173,14 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
     if (isLastStep) {
       await handleSubmitListing();
     } else {
+      setDirection('next');
       await goToNextStep();
     }
+  };
+
+  const handleBack = async () => {
+    setDirection('back');
+    await goToPreviousStep();
   };
 
   const handleClose = () => {
@@ -158,12 +191,31 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
     }
   };
 
+  const stepIn = direction === 'next' ? wizardNextIn : wizardBackIn;
+  const stepOut = direction === 'next' ? wizardNextOut : wizardBackOut;
+
+  const nextScale = useSharedValue(1);
+  const backScale = useSharedValue(1);
+
+  const handleNextPressIn = () => { nextScale.value = withSpring(0.95, springConfig); };
+  const handleNextPressOut = () => { nextScale.value = withSpring(1, springConfig); };
+  const handleBackPressIn = () => { backScale.value = withSpring(0.95, springConfig); };
+  const handleBackPressOut = () => { backScale.value = withSpring(1, springConfig); };
+
+  const nextAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: nextScale.value }],
+  }));
+
+  const backAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: backScale.value }],
+  }));
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity 
-            onPress={isFirstStep ? handleClose : goToPreviousStep}
+            onPress={isFirstStep ? handleClose : handleBack}
             style={[styles.iconButton, { backgroundColor: theme.card }]}
           >
             <Ionicons name={isFirstStep ? "close" : "arrow-back"} size={22} color={theme.text} />
@@ -173,9 +225,11 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
             <AppText variant="caption" weight="semiBold" color={theme.subtext}>
               Step {currentStep + 1} of {steps.length}
             </AppText>
-            <AppText variant="title" weight="bold" color={theme.text}>
-              {steps[currentStep].title}
-            </AppText>
+            <Animated.View key={`title-${currentStep}`} entering={FadeIn.duration(400)}>
+              <AppText variant="title" weight="bold" color={theme.text}>
+                {steps[currentStep].title}
+              </AppText>
+            </Animated.View>
           </View>
 
           <View style={[styles.progressCircle, { borderColor: theme.border }]}>
@@ -185,7 +239,7 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
           </View>
         </View>
         <View style={[styles.progressBarOuter, { backgroundColor: theme.border + '30' }]}>
-          <View style={[styles.progressBarInner, { width: `${progress}%`, backgroundColor: theme.primary }]} />
+          <Animated.View style={[styles.progressBarInner, { backgroundColor: theme.primary }, progressBarStyle]} />
         </View>
       </View>
 
@@ -194,35 +248,50 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={keyboardVerticalOffset}
       >
-        <ActiveComponent 
-          onEditStep={(idx: number) => setCurrentStep(idx)} 
-          isStandalone={isStandalone}
-          isEditing={isEditing}
-        />
+        <Animated.View 
+          key={`step-${currentStep}`} 
+          entering={stepIn}
+          exiting={stepOut}
+          style={{ flex: 1 }}
+        >
+          <ActiveComponent 
+            onEditStep={(idx: number) => setCurrentStep(idx)} 
+            isStandalone={isStandalone}
+            isEditing={isEditing}
+          />
+        </Animated.View>
       </KeyboardAvoidingView>
 
       <BlurView intensity={80} tint={theme.dark ? 'dark' : 'light'} style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <View style={styles.footerContent}>
           {!isFirstStep && (
-            <TouchableOpacity 
-              style={[styles.backButton, { backgroundColor: theme.card, borderColor: theme.border }]} 
-              onPress={goToPreviousStep}
-            >
-              <AppText weight="semiBold" color={theme.text}>Back</AppText>
-            </TouchableOpacity>
+            <Animated.View style={[{ flex: 1 }, backAnimatedStyle]}>
+              <Pressable 
+                onPressIn={handleBackPressIn}
+                onPressOut={handleBackPressOut}
+                style={[styles.backButton, { backgroundColor: theme.card, borderColor: theme.border }]} 
+                onPress={handleBack}
+              >
+                <AppText weight="semiBold" color={theme.text}>Back</AppText>
+              </Pressable>
+            </Animated.View>
           )}
           
-          <TouchableOpacity 
-            style={[styles.nextButton, { backgroundColor: theme.primary }, !isFirstStep && { flex: 2 }]} 
-            onPress={handleNext}
-            disabled={loading}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : (
-              <AppText weight="bold" color="#fff">
-                {isLastStep ? 'Complete' : 'Continue'}
-              </AppText>
-            )}
-          </TouchableOpacity>
+          <Animated.View style={[{ flex: 2 }, !isFirstStep && { marginLeft: 12 }, nextAnimatedStyle]}>
+            <Pressable 
+              onPressIn={handleNextPressIn}
+              onPressOut={handleNextPressOut}
+              style={[styles.nextButton, { backgroundColor: theme.primary }]} 
+              onPress={handleNext}
+              disabled={loading}
+            >
+              {loading ? <ActivityIndicator color="#fff" /> : (
+                <AppText weight="bold" color="#fff">
+                  {isLastStep ? 'Complete' : 'Continue'}
+                </AppText>
+              )}
+            </Pressable>
+          </Animated.View>
         </View>
       </BlurView>
     </View>

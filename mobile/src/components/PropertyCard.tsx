@@ -12,8 +12,15 @@ import Animated, {
   useSharedValue, 
   useAnimatedStyle, 
   withSpring, 
+  withSequence,
+  withTiming,
   FadeInDown
 } from 'react-native-reanimated';
+import { 
+  springConfig, 
+  pressFeedbackScale, 
+  heartBounceScale 
+} from '../utils/animations';
 
 import { useThemeColor } from '../hooks/useThemeColor';
 import { AppText } from './AppText';
@@ -34,6 +41,8 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
   const [activeIndex, setActiveIndex] = useState(0);
   
   const isFavorite = favoriteStore.isFavorite(property.property_id);
+  const heartScale = useSharedValue(1);
+  const cardScale = useSharedValue(1);
   
   const toggleFavorite = (e: any) => {
     e.stopPropagation();
@@ -41,23 +50,30 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
       router.push('/login');
       return;
     }
+    
+    // Heart bounce animation
+    heartScale.value = withSequence(
+      withSpring(1.3, springConfig),
+      withSpring(1, springConfig)
+    );
+    
     favoriteStore.toggleFavorite(property.property_id);
   };
   
-  const scale = useSharedValue(1);
-  
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
-  });
+  const cardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale.value }],
+  }));
+
+  const heartAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: heartScale.value }],
+  }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.97);
+    cardScale.value = withSpring(0.98, springConfig);
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1);
+    cardScale.value = withSpring(1, springConfig);
   };
 
   const photos = (property.photos && property.photos.length > 0) 
@@ -102,8 +118,8 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
     ? (property.property_category ? property.property_category.charAt(0).toUpperCase() + property.property_category.slice(1) : 'Building')
     : getPropertyDisplayPrice(property);
   
-  const isSale = !!property.forSale || !!property.is_available_for_sale || !!property.for_sale || property.purpose?.toUpperCase() === 'SALE' || property.purpose?.toUpperCase() === 'BOTH';
-  const isRent = !!property.forRent || !!property.is_available_for_rent || !!property.for_rent || property.purpose?.toUpperCase() === 'RENT' || property.purpose?.toUpperCase() === 'BOTH';
+  const isSale = !!property.forSale || !!property.is_available_for_sale || !!property.for_sale || !!property.isAvailableForSale || property.purpose?.toLowerCase() === 'sale' || property.purpose?.toLowerCase() === 'both';
+  const isRent = !!property.forRent || !!property.is_available_for_rent || !!property.for_rent || !!property.isAvailableForRent || property.purpose?.toLowerCase() === 'rent' || property.purpose?.toLowerCase() === 'both';
   const isPubliclyAvailable = isSale || isRent;
   
   let propertyTitle = property.title || property.property_type || 'Modern Living Space';
@@ -118,8 +134,8 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
   }
 
   const addressParts: string[] = [];
-  const areaName = property.AreaData?.name || property.area?.name;
-  const cityName = property.ProvinceData?.name || property.province?.name || property.city;
+  const areaName = property.AreaData?.name || property.area?.name || property.area_name;
+  const cityName = property.ProvinceData?.name || property.province?.name || property.city || property.province_name;
 
   if (areaName) {
     let cleanedArea = areaName.replace(/(District|Nahiya)\s+\d+/gi, '').trim();
@@ -184,250 +200,260 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
     const areaLabel = property.area_size ?? '-';
 
     return (
+      <Pressable
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={onPress}
+      >
+        <Animated.View 
+          entering={FadeInDown.delay(index * 100).duration(500)}
+          style={[cardAnimatedStyle]}
+        >
+          <View 
+            style={[styles.compactCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+          >
+            <View style={styles.compactMedia}>
+              {photos.length > 0 ? (
+                <FlatList
+                  data={photos}
+                  renderItem={renderImageItem}
+                  keyExtractor={(item, idx) => `compact-${idx}`}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
+                  style={styles.compactFlatList}
+                  nestedScrollEnabled={true}
+                />
+              ) : (
+                <View>
+                  <Image source={DefaultPropertyImage} style={styles.compactImage} contentFit="cover" />
+                </View>
+              )}
+              
+              <View style={styles.compactImageOverlay} />
+              
+              {isPubliclyAvailable && (
+                <View style={[styles.availabilityDotAbsolute, { backgroundColor: themeColors.success, top: 12, left: 12, right: 'auto' }]} />
+              )}
+
+              <View style={[styles.compactBadgeRow, { left: 34 }]}>
+                {isSale && (
+                  <View style={[styles.compactTag, { backgroundColor: themeColors.primary }]}> 
+                    <AppText variant="tiny" weight="bold" color={themeColors.white}>Sale</AppText>
+                  </View>
+                )}
+                {isRent && (
+                  <View style={[styles.compactTag, { backgroundColor: themeColors.success }]}> 
+                    <AppText variant="tiny" weight="bold" color={themeColors.white}>Rent</AppText>
+                  </View>
+                )}
+              </View>
+              
+              <PaginationDots length={photos.length} active={activeIndex} />
+
+              <TouchableOpacity 
+                style={[styles.compactFavorite, { top: 12, right: 52, backgroundColor: 'rgba(255,255,255,0.9)' }]} 
+                onPress={(e) => {
+                  e.stopPropagation();
+                  shareProperty(property);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="share-social-outline" size={18} color={themeColors.text} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.compactFavorite, { top: 12, right: 12, backgroundColor: 'rgba(255,255,255,0.9)' }]} 
+                onPress={toggleFavorite}
+                activeOpacity={0.7}
+              >
+                <Animated.View style={heartAnimatedStyle}>
+                  <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? themeColors.danger : themeColors.text} />
+                </Animated.View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.compactBody}>
+              <View style={styles.compactHeaderRow}>
+                <AppText variant="small" weight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 10 }}>
+                  {property.parent_property_id && property.unit_number ? `Unit ${property.unit_number}` : locationLabel}
+                </AppText>
+                <View style={[styles.compactTypeBadge, { backgroundColor: themeColors.background }]}> 
+                  <AppText variant="tiny" weight="bold" color={themeColors.subtext} numberOfLines={1}>
+                    {typeLabel}
+                  </AppText>
+                </View>
+              </View>
+              <AppText variant="small" weight="bold" color={themeColors.primary} numberOfLines={1} style={{ marginBottom: 8 }}>
+                {displayPrice}
+              </AppText>
+              <View style={styles.compactMetaRow}>
+                {isContainer ? (
+                  <View style={styles.compactMetaItem}>
+                    <Ionicons name="business-outline" size={14} color={themeColors.subtext} />
+                    <AppText variant="tiny" weight="medium">{property.total_children || 0} Units</AppText>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.compactMetaItem}>
+                      <Ionicons name="bed-outline" size={14} color={themeColors.subtext} />
+                      <AppText variant="tiny" weight="medium">{bedLabel} BHK</AppText>
+                    </View>
+                    <View style={[styles.compactSeparator, { backgroundColor: themeColors.border }]} />
+                    <View style={styles.compactMetaItem}>
+                      <MaterialCommunityIcons name="vector-square" size={14} color={themeColors.subtext} />
+                      <AppText variant="tiny" weight="medium">{areaLabel} sqft</AppText>
+                    </View>
+                  </>
+                )}
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+    >
       <Animated.View 
         entering={FadeInDown.delay(index * 100).duration(500)}
-        style={[animatedStyle]}
+        style={[cardAnimatedStyle]}
       >
         <View 
-          style={[styles.compactCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+          style={[
+            styles.container, 
+            { 
+              backgroundColor: themeColors.card, 
+              borderColor: themeColors.border,
+              borderWidth: 1,
+              borderRadius: 20,
+              overflow: 'hidden',
+              marginBottom: 20,
+            }
+          ]}
         >
-          <View style={styles.compactMedia}>
+          {/* Image Section */}
+          <View style={styles.imageWrapper}>
             {photos.length > 0 ? (
               <FlatList
                 data={photos}
                 renderItem={renderImageItem}
-                keyExtractor={(item, idx) => `compact-${idx}`}
+                keyExtractor={(item, idx) => `default-${idx}`}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
-                style={styles.compactFlatList}
+                style={styles.flatList}
                 nestedScrollEnabled={true}
               />
             ) : (
-              <Pressable onPress={onPress}>
-                <Image source={DefaultPropertyImage} style={styles.compactImage} contentFit="cover" />
-              </Pressable>
+              <View>
+                <Image source={DefaultPropertyImage} style={styles.image} contentFit="cover" />
+              </View>
             )}
-            
-            <View style={styles.compactImageOverlay} />
-            
+
             {isPubliclyAvailable && (
               <View style={[styles.availabilityDotAbsolute, { backgroundColor: themeColors.success, top: 12, left: 12, right: 'auto' }]} />
             )}
 
-            <View style={[styles.compactBadgeRow, { left: 34 }]}>
+            <PaginationDots length={photos.length} active={activeIndex} />
+            
+            <View style={[styles.badgeRow, { top: 12, left: 34 }]}>
               {isSale && (
-                <View style={[styles.compactTag, { backgroundColor: themeColors.primary }]}> 
+                <View style={[styles.statusTag, { backgroundColor: themeColors.primary }]}> 
                   <AppText variant="tiny" weight="bold" color={themeColors.white}>Sale</AppText>
                 </View>
               )}
               {isRent && (
-                <View style={[styles.compactTag, { backgroundColor: themeColors.success }]}> 
+                <View style={[styles.statusTag, { backgroundColor: themeColors.success }]}> 
                   <AppText variant="tiny" weight="bold" color={themeColors.white}>Rent</AppText>
                 </View>
               )}
             </View>
-            
-            <PaginationDots length={photos.length} active={activeIndex} />
 
             <TouchableOpacity 
-              style={[styles.compactFavorite, { top: 12, right: 52, backgroundColor: 'rgba(255,255,255,0.9)' }]} 
+              style={[styles.favoriteBtn, { top: 12, right: 56, backgroundColor: 'rgba(255,255,255,0.9)' }]}
+              activeOpacity={0.8}
               onPress={(e) => {
                 e.stopPropagation();
                 shareProperty(property);
               }}
-              activeOpacity={0.7}
             >
               <Ionicons name="share-social-outline" size={18} color={themeColors.text} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.compactFavorite, { top: 12, right: 12, backgroundColor: 'rgba(255,255,255,0.9)' }]} 
+              style={[styles.favoriteBtn, { top: 12, right: 12, backgroundColor: 'rgba(255,255,255,0.9)' }]}
+              activeOpacity={0.8}
               onPress={toggleFavorite}
-              activeOpacity={0.7}
             >
-              <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? themeColors.danger : themeColors.text} />
+              <Animated.View style={heartAnimatedStyle}>
+                <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? themeColors.danger : themeColors.text} />
+              </Animated.View>
             </TouchableOpacity>
           </View>
 
-          <Pressable 
-            onPress={onPress}
-            style={styles.compactBody}
-          >
-            <View style={styles.compactHeaderRow}>
-              <AppText variant="small" weight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 10 }}>
-                {property.parent_property_id && property.unit_number ? `Unit ${property.unit_number}` : locationLabel}
-              </AppText>
-              <View style={[styles.compactTypeBadge, { backgroundColor: themeColors.background }]}> 
-                <AppText variant="tiny" weight="bold" color={themeColors.subtext} numberOfLines={1}>
-                  {typeLabel}
+          {/* Info Section */}
+          <View style={styles.infoSection}>
+            <View style={styles.priceRow}>
+              <View style={styles.priceContainer}>
+                <AppText variant="small" weight="bold" numberOfLines={1} color={isContainer ? themeColors.text : themeColors.primary}> 
+                  {displayPrice}
+                  {!isContainer && (
+                    <AppText variant="tiny" color={themeColors.mutedText}> / {isRent && !isSale ? 'mo' : 'yr'}</AppText>
+                  )}
                 </AppText>
               </View>
-            </View>
-            <AppText variant="small" weight="bold" color={themeColors.primary} numberOfLines={1} style={{ marginBottom: 8 }}>
-              {displayPrice}
-            </AppText>
-            <View style={styles.compactMetaRow}>
-              {isContainer ? (
-                <View style={styles.compactMetaItem}>
-                  <Ionicons name="business-outline" size={14} color={themeColors.subtext} />
-                  <AppText variant="tiny" weight="medium">{property.total_children || 0} Units</AppText>
-                </View>
-              ) : (
-                <>
-                  <View style={styles.compactMetaItem}>
-                    <Ionicons name="bed-outline" size={14} color={themeColors.subtext} />
-                    <AppText variant="tiny" weight="medium">{bedLabel} BHK</AppText>
-                  </View>
-                  <View style={[styles.compactSeparator, { backgroundColor: themeColors.border }]} />
-                  <View style={styles.compactMetaItem}>
-                    <MaterialCommunityIcons name="vector-square" size={14} color={themeColors.subtext} />
-                    <AppText variant="tiny" weight="medium">{areaLabel} sqft</AppText>
-                  </View>
-                </>
-              )}
-            </View>
-          </Pressable>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  return (
-    <Animated.View 
-      entering={FadeInDown.delay(index * 100).duration(500)}
-      style={[animatedStyle]}
-    >
-      <View 
-        style={[
-          styles.container, 
-          { 
-            backgroundColor: themeColors.card, 
-            borderColor: themeColors.border,
-            borderWidth: 1,
-            borderRadius: 20,
-            overflow: 'hidden',
-            marginBottom: 20,
-          }
-        ]}
-      >
-        {/* Image Section */}
-        <View style={styles.imageWrapper}>
-          {photos.length > 0 ? (
-            <FlatList
-              data={photos}
-              renderItem={renderImageItem}
-              keyExtractor={(item, idx) => `default-${idx}`}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-              style={styles.flatList}
-              nestedScrollEnabled={true}
-            />
-          ) : (
-            <Pressable onPress={onPress}>
-              <Image source={DefaultPropertyImage} style={styles.image} contentFit="cover" />
-            </Pressable>
-          )}
-
-          {isPubliclyAvailable && (
-            <View style={[styles.availabilityDotAbsolute, { backgroundColor: themeColors.success, top: 16, left: 16, right: 'auto' }]} />
-          )}
-
-          <PaginationDots length={photos.length} active={activeIndex} />
-          
-          <View style={[styles.badgeRow, { left: 38 }]}>
-            {isSale && (
-              <View style={[styles.statusTag, { backgroundColor: themeColors.primary }]}> 
-                <AppText variant="tiny" weight="bold" color={themeColors.white}>Sale</AppText>
+              <View style={[styles.ratingContainer, { backgroundColor: themeColors.warningSubtle }]}>
+                <Ionicons name="star" size={14} color={themeColors.warning} />
+                <AppText variant="caption" weight="bold" style={{ marginLeft: 4, color: themeColors.warningText }}>4.0</AppText>
               </View>
-            )}
-            {isRent && (
-              <View style={[styles.statusTag, { backgroundColor: themeColors.success }]}> 
-                <AppText variant="tiny" weight="bold" color={themeColors.white}>Rent</AppText>
-              </View>
-            )}
-          </View>
+            </View>
 
-          <TouchableOpacity 
-            style={[styles.favoriteBtn, { top: 16, right: 62, backgroundColor: 'rgba(255,255,255,0.9)' }]}
-            activeOpacity={0.8}
-            onPress={(e) => {
-              e.stopPropagation();
-              shareProperty(property);
-            }}
-          >
-            <Ionicons name="share-social-outline" size={18} color={themeColors.text} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.favoriteBtn, { top: 16, right: 16, backgroundColor: 'rgba(255,255,255,0.9)' }]}
-            activeOpacity={0.8}
-            onPress={toggleFavorite}
-          >
-            <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? themeColors.danger : themeColors.text} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Info Section */}
-        <Pressable 
-          onPress={onPress}
-          style={styles.infoSection}
-        >
-          <View style={styles.priceRow}>
-            <View style={styles.priceContainer}>
-              <AppText variant="small" weight="bold" numberOfLines={1} color={isContainer ? themeColors.text : themeColors.primary}> 
-                {displayPrice}
-                {!isContainer && (
-                  <AppText variant="tiny" color={themeColors.mutedText}> / {isRent && !isSale ? 'mo' : 'yr'}</AppText>
-                )}
+            <View style={styles.titleRow}>
+              <AppText variant="tiny" weight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 12 }}>
+                {propertyTitle}
               </AppText>
-            </View>
-            <View style={[styles.ratingContainer, { backgroundColor: themeColors.warningSubtle }]}>
-              <Ionicons name="star" size={14} color={themeColors.warning} />
-              <AppText variant="caption" weight="bold" style={{ marginLeft: 4, color: themeColors.warningText }}>4.0</AppText>
-            </View>
-          </View>
-
-          <View style={styles.titleRow}>
-            <AppText variant="tiny" weight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 12 }}>
-              {propertyTitle}
-            </AppText>
             
-            <View style={styles.featureRow}>
-              {isContainer ? (
-                <View style={styles.featureItem}>
-                  <Ionicons name="business-outline" size={16} color={themeColors.mutedText} />
-                  <AppText variant="small" weight="medium" style={{ marginLeft: 4 }}>{property.total_children || 0} Units</AppText>
-                </View>
-              ) : (
-                <>
+              <View style={styles.featureRow}>
+                {isContainer ? (
                   <View style={styles.featureItem}>
-                    <Ionicons name="bed-outline" size={16} color={themeColors.mutedText} />
-                    <AppText variant="small" weight="medium" style={{ marginLeft: 4 }}>{property.bedrooms || 0}</AppText>
+                    <Ionicons name="business-outline" size={16} color={themeColors.mutedText} />
+                    <AppText variant="small" weight="medium" style={{ marginLeft: 4 }}>{property.total_children || 0} Units</AppText>
                   </View>
-                  <View style={styles.featureItem}>
-                    <MaterialCommunityIcons name="bathtub-outline" size={16} color={themeColors.mutedText} />
-                    <AppText variant="small" weight="medium" style={{ marginLeft: 4 }}>{property.bathrooms || 0}</AppText>
-                  </View>
-                </>
-              )}
+                ) : (
+                  <>
+                    <View style={styles.featureItem}>
+                      <Ionicons name="bed-outline" size={16} color={themeColors.mutedText} />
+                      <AppText variant="small" weight="medium" style={{ marginLeft: 4 }}>{property.bedrooms || 0}</AppText>
+                    </View>
+                    <View style={styles.featureItem}>
+                      <MaterialCommunityIcons name="bathtub-outline" size={16} color={themeColors.mutedText} />
+                      <AppText variant="small" weight="medium" style={{ marginLeft: 4 }}>{property.bathrooms || 0}</AppText>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
-          </View>
           
             <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={14} color={themeColors.mutedText} />
-              <AppText variant="tiny" color={themeColors.mutedText} numberOfLines={1} style={{ flex: 1 }}>
+              <Ionicons name="location-outline" size={12} color={themeColors.mutedText} />
+              <AppText variant="tiny" color={themeColors.mutedText} numberOfLines={1} style={{ flex: 1, fontSize: 10 }}>
                 {fullAddress || 'Location details'}
               </AppText>
             </View>
-        </Pressable>
-      </View>
-    </Animated.View>
+          </View>
+        </View>
+      </Animated.View>
+    </Pressable>
   );
 });
 

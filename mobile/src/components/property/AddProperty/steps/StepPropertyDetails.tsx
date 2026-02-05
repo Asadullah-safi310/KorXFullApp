@@ -11,6 +11,10 @@ import { useFormikContext } from 'formik';
 import { useThemeColor } from '../../../../hooks/useThemeColor';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText } from '../../../AppText';
+import { AnimatedFormInput } from '../../../AnimatedFormInput';
+
+import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
+import { smoothLayout } from '../../../../utils/animations';
 
 const CustomSlider = ({ label, value, onChange, min = 0, max = 10 }: any) => {
   const theme = useThemeColor();
@@ -56,13 +60,6 @@ const StepPropertyDetails = () => {
   const showBedBath = !values.is_parent && (values.property_type === 'house' || values.property_type === 'apartment');
   const showUnitFields = isAddingChild && (values.property_type === 'apartment' || values.property_type === 'shop' || values.property_type === 'office');
   
-  const renderError = (field: string) => {
-    if (touched[field] && errors[field]) {
-      return <AppText variant="caption" weight="semiBold" style={[{ color: theme.danger }, styles.errorText]}>{errors[field] as string}</AppText>;
-    }
-    return null;
-  };
-
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <AppText variant="h2" weight="bold" style={{ color: theme.text }}>Details</AppText>
@@ -72,23 +69,25 @@ const StepPropertyDetails = () => {
 
       {/* Unit Specific Fields */}
       {showUnitFields && (
-        <View style={{ gap: 16, marginBottom: 20 }}>
+        <Animated.View 
+          entering={FadeIn} 
+          exiting={FadeOut}
+          layout={smoothLayout}
+          style={{ gap: 16, marginBottom: 0 }}
+        >
           <View style={styles.row}>
             {/* Apartment Number (Only for Apartment type) */}
             {values.property_type === 'apartment' && (
               <View style={{ flex: 1 }}>
-                <AppText variant="caption" weight="semiBold" style={{ color: theme.text }}>Apartment Number</AppText>
-                <View style={[styles.textInputContainer, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 8 }]}>
-                  <Ionicons name="pricetag-outline" size={20} color={theme.subtext} style={styles.inputIcon} />
-                  <TextInput 
-                    style={[styles.input, { color: theme.text }]}
-                    placeholder="e.g. 4B"
-                    placeholderTextColor={theme.text + '40'}
-                    value={values.unit_number}
-                    onChangeText={(text) => setFieldValue('unit_number', text)}
-                  />
-                </View>
-                {renderError('unit_number')}
+                <AnimatedFormInput
+                  label="Apartment No"
+                  placeholder="e.g. 4B"
+                  value={values.unit_number}
+                  onChangeText={(text) => setFieldValue('unit_number', text)}
+                  error={errors.unit_number as string}
+                  touched={touched.unit_number}
+                  icon={<Ionicons name="pricetag-outline" size={20} color={theme.subtext} />}
+                />
               </View>
             )}
             
@@ -96,48 +95,44 @@ const StepPropertyDetails = () => {
 
             {/* Floor */}
             <View style={{ flex: 1 }}>
-              <AppText variant="caption" weight="semiBold" style={{ color: theme.text }}>Floor</AppText>
-              <View style={[styles.textInputContainer, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 8 }]}>
-                <MaterialCommunityIcons name="layers-outline" size={20} color={theme.subtext} style={styles.inputIcon} />
-                <TextInput 
-                  style={[styles.input, { color: theme.text }]}
-                  placeholder="e.g. 2nd"
-                  placeholderTextColor={theme.text + '40'}
-                  value={values.floor}
-                  onChangeText={(text) => setFieldValue('floor', text)}
-                />
-              </View>
-              {renderError('floor')}
+              <AnimatedFormInput
+                label="Floor"
+                placeholder="e.g. 2nd"
+                value={values.floor}
+                onChangeText={(text) => setFieldValue('floor', text)}
+                error={errors.floor as string}
+                touched={touched.floor}
+                icon={<MaterialCommunityIcons name="layers-outline" size={20} color={theme.subtext} />}
+              />
             </View>
           </View>
-        </View>
+        </Animated.View>
       )}
 
       {/* Area Size (Hide for parents) */}
       {!values.is_parent && (
-        <View style={styles.inputGroup}>
-          <AppText variant="caption" weight="semiBold" style={{ color: theme.text }}>Total Area</AppText>
-          <View style={[styles.textInputContainer, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 8 }]}>
-            <MaterialCommunityIcons name="ruler-square" size={20} color={theme.subtext} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              value={values.area_size?.toString()}
-              onChangeText={(t) => setFieldValue('area_size', t)}
-              placeholder="e.g. 1200"
-              placeholderTextColor={theme.text + '40'}
-              keyboardType="numeric"
-            />
-            <View style={[styles.unitBadge, { backgroundColor: theme.border + '30' }]}>
-              <AppText variant="tiny" weight="bold" style={{ color: theme.subtext }}>Sq. Ft.</AppText>
-            </View>
-          </View>
-          {renderError('area_size')}
-        </View>
+        <Animated.View layout={smoothLayout}>
+          <AnimatedFormInput
+            label="Total Area (Sq. Ft.)"
+            placeholder="e.g. 1200"
+            value={values.area_size?.toString()}
+            onChangeText={(t) => setFieldValue('area_size', t)}
+            error={errors.area_size as string}
+            touched={touched.area_size}
+            keyboardType="numeric"
+            icon={<MaterialCommunityIcons name="ruler-square" size={20} color={theme.subtext} />}
+          />
+        </Animated.View>
       )}
 
       {/* Bedrooms / Bathrooms */}
       {showBedBath && (
-        <View style={styles.slidersRow}>
+        <Animated.View 
+          entering={FadeIn} 
+          exiting={FadeOut}
+          layout={smoothLayout}
+          style={styles.slidersRow}
+        >
           <CustomSlider
             label="Bedrooms"
             value={values.bedrooms}
@@ -148,46 +143,45 @@ const StepPropertyDetails = () => {
             value={values.bathrooms}
             onChange={(v: number) => setFieldValue('bathrooms', v)}
           />
-        </View>
+        </Animated.View>
       )}
 
       {/* Building Specific (For Parents) */}
       {values.is_parent && (
-        <View style={{ gap: 16 }}>
+        <Animated.View 
+          entering={FadeIn} 
+          exiting={FadeOut}
+          layout={smoothLayout}
+          style={{ gap: 16 }}
+        >
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <AppText variant="caption" weight="semiBold" style={{ color: theme.text }}>Total Floors</AppText>
-              <View style={[styles.textInputContainer, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 8 }]}>
-                <MaterialCommunityIcons name="layers-outline" size={20} color={theme.subtext} style={styles.inputIcon} />
-                <TextInput 
-                  style={[styles.input, { color: theme.text }]}
-                  placeholder="e.g. 10"
-                  placeholderTextColor={theme.text + '40'}
-                  keyboardType="numeric"
-                  value={values.total_floors?.toString()}
-                  onChangeText={(text) => setFieldValue('total_floors', text)}
-                />
-              </View>
-              {renderError('total_floors')}
+              <AnimatedFormInput
+                label="Total Floors"
+                placeholder="e.g. 10"
+                keyboardType="numeric"
+                value={values.total_floors?.toString()}
+                onChangeText={(text) => setFieldValue('total_floors', text)}
+                error={errors.total_floors as string}
+                touched={touched.total_floors}
+                icon={<MaterialCommunityIcons name="layers-outline" size={20} color={theme.subtext} />}
+              />
             </View>
             <View style={{ width: 12 }} />
             <View style={{ flex: 1 }}>
-              <AppText variant="caption" weight="semiBold" style={{ color: theme.text }}>Planned Units</AppText>
-              <View style={[styles.textInputContainer, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 8 }]}>
-                <MaterialCommunityIcons name="home-group" size={20} color={theme.subtext} style={styles.inputIcon} />
-                <TextInput 
-                  style={[styles.input, { color: theme.text }]}
-                  placeholder="e.g. 50"
-                  placeholderTextColor={theme.text + '40'}
-                  keyboardType="numeric"
-                  value={values.planned_units?.toString()}
-                  onChangeText={(text) => setFieldValue('planned_units', text)}
-                />
-              </View>
-              {renderError('planned_units')}
+              <AnimatedFormInput
+                label="Planned Units"
+                placeholder="e.g. 50"
+                keyboardType="numeric"
+                value={values.planned_units?.toString()}
+                onChangeText={(text) => setFieldValue('planned_units', text)}
+                error={errors.planned_units as string}
+                touched={touched.planned_units}
+                icon={<MaterialCommunityIcons name="home-group" size={20} color={theme.subtext} />}
+              />
             </View>
           </View>
-        </View>
+        </Animated.View>
       )}
     </ScrollView>
   );

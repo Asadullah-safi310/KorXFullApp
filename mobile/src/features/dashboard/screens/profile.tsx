@@ -9,13 +9,17 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import dealStore from '../../../stores/DealStore';
 import Avatar from '../../../components/Avatar';
 import ScreenLayout from '../../../components/ScreenLayout';
+import Animated, { FadeInUp, FadeInRight, Layout } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
-const StatCard = ({ icon, label, value, color }: any) => {
+const StatCard = ({ icon, label, value, color, index = 0 }: any) => {
   const themeColors = useThemeColor();
   return (
-    <View style={[styles.statCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
+    <Animated.View 
+      entering={FadeInUp.delay(index * 100).duration(500)}
+      style={[styles.statCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+    >
       <View style={[styles.statIconBadge, { backgroundColor: color + '12' }]}>
         {React.cloneElement(icon, { size: 18, color: color })}
       </View>
@@ -23,7 +27,7 @@ const StatCard = ({ icon, label, value, color }: any) => {
         <Text style={[styles.statValue, { color: themeColors.text }]}>{value}</Text>
         <Text style={[styles.statLabel, { color: themeColors.subtext }]}>{label}</Text>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -178,17 +182,17 @@ const ProfileScreen = observer(() => {
         <View style={styles.statsGrid}>
           {isAgent ? (
             <>
-              <StatCard label="Managed" value={stats.total_managed} color="#3b82f6" icon={<Ionicons name="business" />} />
-              <StatCard label="Active Deals" value={stats.active_deals} color="#f59e0b" icon={<Ionicons name="swap-horizontal" />} />
-              <StatCard label="Public" value={stats.public_listings} color="#10b981" icon={<Ionicons name="globe" />} />
-              <StatCard label="Listed" value={stats.total_listed} color="#8b5cf6" icon={<Ionicons name="list" />} />
+              <StatCard index={0} label="Managed" value={stats.total_managed} color="#3b82f6" icon={<Ionicons name="business" />} />
+              <StatCard index={1} label="Active Deals" value={stats.active_deals} color="#f59e0b" icon={<Ionicons name="swap-horizontal" />} />
+              <StatCard index={2} label="Public" value={stats.public_listings} color="#10b981" icon={<Ionicons name="globe" />} />
+              <StatCard index={3} label="Listed" value={stats.total_listed} color="#8b5cf6" icon={<Ionicons name="list" />} />
             </>
           ) : (
             <>
-              <StatCard label="My Properties" value={stats.total_listed} color="#3b82f6" icon={<Ionicons name="home" />} />
-              <StatCard label="Public" value={stats.public_listings} color="#10b981" icon={<Ionicons name="globe" />} />
-              <StatCard label="Favorites" value={0} color="#ef4444" icon={<Ionicons name="heart" />} />
-              <StatCard label="Inquiries" value={0} color="#8b5cf6" icon={<Ionicons name="chatbubbles" />} />
+              <StatCard index={0} label="My Properties" value={stats.total_listed} color="#3b82f6" icon={<Ionicons name="home" />} />
+              <StatCard index={1} label="Public" value={stats.public_listings} color="#10b981" icon={<Ionicons name="globe" />} />
+              <StatCard index={2} label="Favorites" value={0} color="#ef4444" icon={<Ionicons name="heart" />} />
+              <StatCard index={3} label="Inquiries" value={0} color="#8b5cf6" icon={<Ionicons name="chatbubbles" />} />
             </>
           )}
         </View>
@@ -197,6 +201,7 @@ const ProfileScreen = observer(() => {
         <View style={[styles.menuCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
           {isAdmin && (
             <MenuLink 
+              index={0}
               icon="shield-checkmark-outline" 
               title="Admin Dashboard" 
               onPress={() => router.push('/admin')} 
@@ -204,6 +209,7 @@ const ProfileScreen = observer(() => {
             />
           )}
           <MenuLink 
+            index={1}
             icon="home-outline" 
             title="My Properties" 
             onPress={() => router.push('/profile/my-properties')} 
@@ -212,18 +218,21 @@ const ProfileScreen = observer(() => {
           {(isAgent || isAdmin) && (
             <>
               <MenuLink 
+                index={2}
                 icon="business-outline" 
                 title="My Towers" 
                 onPress={() => router.push('/profile/my-apartments')} 
                 theme={themeColors}
               />
               <MenuLink 
+                index={3}
                 icon="storefront-outline" 
                 title="My Markets" 
                 onPress={() => router.push('/profile/my-markets')} 
                 theme={themeColors}
               />
               <MenuLink 
+                index={4}
                 icon="people-outline" 
                 title="My Sharaks" 
                 onPress={() => router.push('/profile/my-sharaks')} 
@@ -233,6 +242,7 @@ const ProfileScreen = observer(() => {
           )}
           {isAgent && (
             <MenuLink 
+              index={5}
               icon="handshake" 
               iconFamily="MaterialCommunityIcons"
               title="Transaction History" 
@@ -241,18 +251,21 @@ const ProfileScreen = observer(() => {
             />
           )}
           <MenuLink 
+            index={6}
             icon="heart-outline" 
             title="Saved Favorites" 
             onPress={() => router.push('/profile/favorites')} 
             theme={themeColors}
           />
           <MenuLink 
+            index={7}
             icon="settings-outline" 
             title="Account Settings" 
             onPress={() => router.push('/profile/settings')} 
             theme={themeColors}
           />
           <MenuLink 
+            index={8}
             icon="help-circle-outline" 
             title="Support Center" 
             onPress={() => router.push('/profile/help')} 
@@ -277,21 +290,23 @@ const ProfileScreen = observer(() => {
   );
 });
 
-const MenuLink = ({ icon, iconFamily = 'Ionicons', title, onPress, theme, isLast }: any) => (
-  <TouchableOpacity 
-    style={[styles.menuLink, !isLast && { borderBottomColor: theme.border, borderBottomWidth: 1 }]} 
-    onPress={onPress}
-  >
-    <View style={[styles.menuIconBox, { backgroundColor: theme.background }]}>
-      {iconFamily === 'Ionicons' ? (
-        <Ionicons name={icon} size={20} color={theme.primary} />
-      ) : (
-        <MaterialCommunityIcons name={icon} size={20} color={theme.primary} />
-      )}
-    </View>
-    <Text style={[styles.menuLinkText, { color: theme.text }]}>{title}</Text>
-    <Ionicons name="chevron-forward" size={18} color={theme.border} />
-  </TouchableOpacity>
+const MenuLink = ({ icon, iconFamily = 'Ionicons', title, onPress, theme, isLast, index = 0 }: any) => (
+  <Animated.View entering={FadeInRight.delay(index * 50 + 400).duration(400)}>
+    <TouchableOpacity 
+      style={[styles.menuLink, !isLast && { borderBottomColor: theme.border, borderBottomWidth: 1 }]} 
+      onPress={onPress}
+    >
+      <View style={[styles.menuIconBox, { backgroundColor: theme.background }]}>
+        {iconFamily === 'Ionicons' ? (
+          <Ionicons name={icon} size={20} color={theme.primary} />
+        ) : (
+          <MaterialCommunityIcons name={icon} size={20} color={theme.primary} />
+        )}
+      </View>
+      <Text style={[styles.menuLinkText, { color: theme.text }]}>{title}</Text>
+      <Ionicons name="chevron-forward" size={18} color={theme.border} />
+    </TouchableOpacity>
+  </Animated.View>
 );
 
 const styles = StyleSheet.create({

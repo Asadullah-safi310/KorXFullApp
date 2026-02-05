@@ -70,6 +70,17 @@ const StepOwnership = observer(({ isStandalone, isEditing, isAddingChild: isAddi
     };
   }, [values.property_category, values.is_parent, values.parent_property_id, values.parentId, values.apartment_id, isAddingChildProp]);
 
+  useEffect(() => {
+    // Ensure property_type is set if it's empty but required
+    if (!values.property_type) {
+      if (values.is_parent && normalizedCategory !== 'normal') {
+        setFieldValue('property_type', normalizedCategory);
+      } else if (propertyTypes.length === 1) {
+        setFieldValue('property_type', propertyTypes[0].value);
+      }
+    }
+  }, [values.property_type, values.is_parent, normalizedCategory, propertyTypes]);
+
   // Handle category change (for when user can pick category - e.g. adding a new parent)
   const handleCategoryChange = (category: string) => {
     setFieldValue('property_category', category);

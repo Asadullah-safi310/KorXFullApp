@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { 
   View, 
-  TextInput, 
   ScrollView, 
   StyleSheet, 
   TouchableOpacity,
@@ -15,6 +14,7 @@ import { AppText } from '../../../AppText';
 import personStore from '../../../../stores/PersonStore';
 import authStore from '../../../../stores/AuthStore';
 import Avatar from '../../../../components/Avatar';
+import { AnimatedFormInput } from '../../../AnimatedFormInput';
 
 const StepBasicInfo = observer(() => {
   const { values, setFieldValue, errors, touched } = useFormikContext<any>();
@@ -39,7 +39,11 @@ const StepBasicInfo = observer(() => {
 
   const renderError = (field: string) => {
     if (touched[field] && errors[field]) {
-      return <AppText variant="caption" weight="semiBold" style={[{ color: theme.danger }, styles.errorText]}>{errors[field] as string}</AppText>;
+      return (
+        <AppText variant="caption" weight="semiBold" style={[{ color: theme.danger }, styles.errorText]}>
+          {errors[field] as string}
+        </AppText>
+      );
     }
     return null;
   };
@@ -51,37 +55,29 @@ const StepBasicInfo = observer(() => {
         Give your property a catchy title and a clear description.
       </AppText>
 
-      <View style={styles.inputGroup}>
-        <AppText variant="caption" weight="semiBold" style={{ color: theme.text }}>Listing Title</AppText>
-        <View style={[styles.textInputContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <MaterialCommunityIcons name="format-title" size={20} color={theme.subtext} style={styles.inputIcon} />
-          <TextInput
-            style={[styles.input, { color: theme.text }]}
-            value={values.title}
-            onChangeText={(t) => setFieldValue('title', t)}
-            placeholder="e.g. Modern 3-Bedroom Villa with Pool"
-            placeholderTextColor={theme.text + '40'}
-          />
-        </View>
-        {renderError('title')}
-      </View>
+      <AnimatedFormInput
+        label="Listing Title"
+        placeholder="e.g. Modern 3-Bedroom Villa with Pool"
+        value={values.title}
+        onChangeText={(t) => setFieldValue('title', t)}
+        error={errors.title as string}
+        touched={touched.title}
+        icon={<MaterialCommunityIcons name="format-title" size={20} color={theme.subtext} />}
+      />
 
-      <View style={styles.inputGroup}>
-        <AppText variant="caption" weight="semiBold" style={{ color: theme.text }}>Property Description</AppText>
-        <View style={[styles.textInputContainer, styles.textAreaContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <TextInput
-            style={[styles.input, styles.textArea, { color: theme.text }]}
-            value={values.description}
-            onChangeText={(t) => setFieldValue('description', t)}
-            placeholder="Describe the key features, amenities, and nearby attractions..."
-            placeholderTextColor={theme.text + '40'}
-            multiline
-            numberOfLines={5}
-            textAlignVertical="top"
-          />
-        </View>
-        {renderError('description')}
-      </View>
+      <AnimatedFormInput
+        label="Property Description"
+        placeholder="Describe the key features, amenities, and nearby attractions..."
+        value={values.description}
+        onChangeText={(t) => setFieldValue('description', t)}
+        error={errors.description as string}
+        touched={touched.description}
+        multiline
+        numberOfLines={5}
+        textAlignVertical="top"
+        style={styles.textArea}
+        containerStyle={styles.textAreaContainer}
+      />
 
       {/* Owner Assignment (Admin Only) */}
       {authStore.isAdmin && (

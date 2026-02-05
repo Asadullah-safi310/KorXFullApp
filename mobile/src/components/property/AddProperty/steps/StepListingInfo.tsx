@@ -10,6 +10,10 @@ import { useFormikContext } from 'formik';
 import { useThemeColor } from '../../../../hooks/useThemeColor';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText } from '../../../AppText';
+import { AnimatedFormInput } from '../../../AnimatedFormInput';
+
+import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
+import { smoothLayout } from '../../../../utils/animations';
 
 const ToggleCard = ({ label, value, onValueChange, icon, description }: any) => {
   const theme = useThemeColor();
@@ -45,13 +49,6 @@ const StepListingInfo = () => {
   const { values, setFieldValue, errors, touched } = useFormikContext<any>();
   const theme = useThemeColor();
 
-  const renderError = (field: string) => {
-    if (touched[field] && errors[field]) {
-      return <AppText variant="caption" weight="semiBold" style={[{ color: theme.danger }, styles.errorText]}>{errors[field] as string}</AppText>;
-    }
-    return null;
-  };
-
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <AppText variant="h2" weight="bold" style={{ color: theme.text }}>Pricing</AppText>
@@ -72,21 +69,19 @@ const StepListingInfo = () => {
         />
 
         {values.for_sale && (
-          <View style={styles.priceInputContainer}>
-            <View style={[styles.textInputContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <MaterialCommunityIcons name="currency-usd" size={22} color={theme.subtext} />
-              <TextInput
-                style={[styles.input, { color: theme.text }]}
-                placeholder="Sale Price"
-                placeholderTextColor={theme.text + '40'}
-                keyboardType="numeric"
-                value={values.sale_price?.toString()}
-                onChangeText={(t) => setFieldValue('sale_price', t)}
-              />
-              <AppText variant="caption" weight="bold" style={{ color: theme.subtext }}>USD</AppText>
-            </View>
-            {renderError('sale_price')}
-          </View>
+          <Animated.View entering={FadeIn} exiting={FadeOut} layout={smoothLayout}>
+            <AnimatedFormInput
+              label="Sale Price"
+              placeholder="0.00"
+              keyboardType="numeric"
+              value={values.sale_price?.toString()}
+              onChangeText={(t) => setFieldValue('sale_price', t)}
+              error={errors.sale_price as string}
+              touched={touched.sale_price}
+              icon={<MaterialCommunityIcons name="currency-usd" size={22} color={theme.subtext} />}
+              containerStyle={{ marginTop: 0 }}
+            />
+          </Animated.View>
         )}
 
         <ToggleCard
@@ -101,21 +96,19 @@ const StepListingInfo = () => {
         />
 
         {values.for_rent && (
-          <View style={styles.priceInputContainer}>
-            <View style={[styles.textInputContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <MaterialCommunityIcons name="currency-usd" size={22} color={theme.subtext} />
-              <TextInput
-                style={[styles.input, { color: theme.text }]}
-                placeholder="Monthly Rent"
-                placeholderTextColor={theme.text + '40'}
-                keyboardType="numeric"
-                value={values.rent_price?.toString()}
-                onChangeText={(t) => setFieldValue('rent_price', t)}
-              />
-              <AppText variant="caption" weight="bold" style={{ color: theme.subtext }}>/mo</AppText>
-            </View>
-            {renderError('rent_price')}
-          </View>
+          <Animated.View entering={FadeIn} exiting={FadeOut} layout={smoothLayout}>
+            <AnimatedFormInput
+              label="Monthly Rent"
+              placeholder="0.00"
+              keyboardType="numeric"
+              value={values.rent_price?.toString()}
+              onChangeText={(t) => setFieldValue('rent_price', t)}
+              error={errors.rent_price as string}
+              touched={touched.rent_price}
+              icon={<MaterialCommunityIcons name="currency-usd" size={22} color={theme.subtext} />}
+              containerStyle={{ marginTop: 0 }}
+            />
+          </Animated.View>
         )}
       </View>
 

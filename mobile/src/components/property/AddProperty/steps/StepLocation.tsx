@@ -4,6 +4,7 @@ import { useFormikContext } from 'formik';
 import { useThemeColor } from '../../../../hooks/useThemeColor';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText } from '../../../AppText';
+import { AnimatedFormInput } from '../../../AnimatedFormInput';
 
 
 // Safe import for react-native-maps
@@ -113,35 +114,29 @@ const StepLocation = () => {
       </View>
       
       <View style={styles.coordsGrid}>
-        <View style={styles.coordBox}>
-          <AppText variant="tiny" weight="bold" style={[{ color: theme.subtext }, styles.coordLabel]}>LATITUDE</AppText>
-          <View style={[styles.coordInput, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              value={values.latitude ? String(values.latitude) : ''}
-              onChangeText={(v) => setFieldValue('latitude', parseFloat(v) || null)}
-              keyboardType="numeric"
-              placeholder="0.000000"
-              placeholderTextColor={theme.text + '40'}
-            />
-          </View>
+        <View style={{ flex: 1 }}>
+          <AnimatedFormInput
+            label="Latitude"
+            placeholder="0.000000"
+            keyboardType="numeric"
+            value={values.latitude ? String(values.latitude) : ''}
+            onChangeText={(v) => setFieldValue('latitude', parseFloat(v) || null)}
+            error={errors.latitude as string}
+            touched={touched.latitude}
+          />
         </View>
-        <View style={styles.coordBox}>
-          <AppText variant="tiny" weight="bold" style={[{ color: theme.subtext }, styles.coordLabel]}>LONGITUDE</AppText>
-          <View style={[styles.coordInput, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              value={values.longitude ? String(values.longitude) : ''}
-              onChangeText={(v) => setFieldValue('longitude', parseFloat(v) || null)}
-              keyboardType="numeric"
-              placeholder="0.000000"
-              placeholderTextColor={theme.text + '40'}
-            />
-          </View>
+        <View style={{ flex: 1 }}>
+          <AnimatedFormInput
+            label="Longitude"
+            placeholder="0.000000"
+            keyboardType="numeric"
+            value={values.longitude ? String(values.longitude) : ''}
+            onChangeText={(v) => setFieldValue('longitude', parseFloat(v) || null)}
+            error={errors.longitude as string}
+            touched={touched.longitude}
+          />
         </View>
       </View>
-      {renderError('latitude')}
-      {renderError('longitude')}
       
       <View style={[styles.tipBox, { backgroundColor: theme.primary + '08', borderColor: theme.primary + '20' }]}>
         <Ionicons name="bulb-outline" size={20} color={theme.primary} />

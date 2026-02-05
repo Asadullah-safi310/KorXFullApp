@@ -5,6 +5,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { observer } from 'mobx-react-lite';
 import { useThemeColor } from '../../src/hooks/useThemeColor';
 import { View, StyleSheet } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, withSequence } from 'react-native-reanimated';
+import { useEffect } from 'react';
+import { springConfig } from '../../src/utils/animations';
+
+const TabIcon = ({ name, color, focused }: { name: any, color: string, focused: boolean }) => {
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    if (focused) {
+      scale.value = withSequence(
+        withSpring(1.2, springConfig),
+        withSpring(1, springConfig)
+      );
+    }
+  }, [focused]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Ionicons name={name} size={24} color={color} />
+    </Animated.View>
+  );
+};
 
 export default observer(function TabLayout() {
   const { isAgent, isAdmin, isAuthenticated, isLoading } = useAuth();
@@ -37,7 +63,7 @@ export default observer(function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+            <TabIcon name={focused ? "home" : "home-outline"} color={color} focused={focused} />
           ),
         }}
       />
@@ -46,7 +72,7 @@ export default observer(function TabLayout() {
         options={{
           title: 'Properties',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "business" : "business-outline"} size={24} color={color} />
+            <TabIcon name={focused ? "business" : "business-outline"} color={color} focused={focused} />
           ),
         }}
       />
@@ -56,7 +82,7 @@ export default observer(function TabLayout() {
         name="create-property"
         options={{
           title: 'Add',
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color, focused }) => (
             <View style={[styles.fabContainer, { backgroundColor: themeColors.card }]}>
               <View style={[styles.fab, { backgroundColor: themeColors.primary }]}>
                 <Ionicons name="add" size={32} color="#fff" />
@@ -86,7 +112,7 @@ export default observer(function TabLayout() {
         options={{
           title: 'Insights',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "bulb" : "bulb-outline"} size={24} color={color} />
+            <TabIcon name={focused ? "bulb" : "bulb-outline"} color={color} focused={focused} />
           ),
         }}
       />
@@ -96,7 +122,7 @@ export default observer(function TabLayout() {
           title: 'People',
           href: (isAdmin || isAgent) ? '/(tabs)/people' : null,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "people" : "people-outline"} size={24} color={color} />
+            <TabIcon name={focused ? "people" : "people-outline"} color={color} focused={focused} />
           ),
         }}
       />
@@ -105,7 +131,7 @@ export default observer(function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+            <TabIcon name={focused ? "person" : "person-outline"} color={color} focused={focused} />
           ),
         }}
       />

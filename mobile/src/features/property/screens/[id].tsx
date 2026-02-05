@@ -21,7 +21,11 @@ import Animated, {
   useAnimatedStyle, 
   useAnimatedScrollHandler, 
   interpolate, 
-  Extrapolation 
+  Extrapolation,
+  FadeIn,
+  FadeOut,
+  ZoomIn,
+  ZoomOut
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { AMENITY_ICONS } from '../../../constants/Amenities';
@@ -57,32 +61,44 @@ const FullscreenViewer = ({
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.fullscreenContainer}>
+    <Modal visible={visible} transparent onRequestClose={onClose}>
+      <Animated.View 
+        entering={FadeIn.duration(300)} 
+        exiting={FadeOut.duration(200)}
+        style={styles.fullscreenContainer}
+      >
         <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
         
-        <FlatList
-          data={images}
-          horizontal
-          pagingEnabled
-          initialScrollIndex={initialIndex}
-          getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => {
-            setCurrentIndex(Math.round(e.nativeEvent.contentOffset.x / width));
-          }}
-          keyExtractor={(_, index) => index.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.fullscreenImageWrapper}>
-              <Image 
-                source={{ uri: getImageUrl(item) ?? undefined }} 
-                style={styles.fullscreenImage}
-                contentFit="contain"
-              />
-            </View>
-          )}
-        />
+        <Animated.View 
+          entering={ZoomIn.duration(400)}
+          exiting={ZoomOut.duration(300)}
+          style={{ flex: 1 }}
+        >
+          <FlatList
+            data={images}
+            horizontal
+            pagingEnabled
+            initialScrollIndex={initialIndex}
+            getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              setCurrentIndex(Math.round(e.nativeEvent.contentOffset.x / width));
+            }}
+            keyExtractor={(_, index) => index.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.fullscreenImageWrapper}>
+                <Image 
+                  source={{ uri: getImageUrl(item) ?? undefined }} 
+                  style={styles.fullscreenImage}
+                  contentFit="contain"
+                />
+              </View>
+            )}
+          />
+        </Animated.View>
 
         {/* Fullscreen UI */}
         <TouchableOpacity 
@@ -97,7 +113,7 @@ const FullscreenViewer = ({
             {currentIndex + 1} / {images.length}
           </AppText>
         </View>
-      </View>
+      </Animated.View>
     </Modal>
   );
 };
