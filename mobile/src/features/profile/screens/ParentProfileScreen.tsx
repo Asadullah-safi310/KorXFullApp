@@ -7,8 +7,7 @@ import {
   Dimensions, 
   ScrollView, 
   RefreshControl,
-  FlatList,
-  Alert
+  FlatList
 } from 'react-native';
 import { AppText } from '../../../components/AppText';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,6 +22,7 @@ import { getImageUrl } from '../../../utils/mediaUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import ScreenLayout from '../../../components/ScreenLayout';
+import { AMENITY_ICONS } from '../../../constants/Amenities';
 
 const { width } = Dimensions.get('window');
 const HEADER_HEIGHT = 350;
@@ -114,16 +114,27 @@ const ParentProfileScreen = observer(() => {
 
   const isOwner = authStore.user?.user_id === parent.created_by_user_id || authStore.isAdmin;
 
-  const renderFacility = (key: string, label: string, icon: string, provider: 'Ionicons' | 'MaterialCommunityIcons' = 'Ionicons') => {
-    if (!parent.facilities?.[key]) return null;
+  const parseAmenities = (data: any) => {
+    if (Array.isArray(data)) return data;
+    if (typeof data === 'string' && data.startsWith('[')) {
+      try {
+        return JSON.parse(data);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const renderFacility = (label: string) => {
+    const config = AMENITY_ICONS[label];
+    if (!config) return null;
+    
+    const IconProvider = config.provider === 'Ionicons' ? Ionicons : MaterialCommunityIcons;
     return (
-      <View style={[styles.facilityItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        {provider === 'Ionicons' ? (
-          <Ionicons name={icon as any} size={20} color={theme.primary} />
-        ) : (
-          <MaterialCommunityIcons name={icon as any} size={20} color={theme.primary} />
-        )}
-        <AppText variant="caption" color={theme.text} style={{ marginTop: 4 }}>{label}</AppText>
+      <View key={label} style={[styles.facilityItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <IconProvider name={config.icon as any} size={20} color={theme.primary} />
+        <AppText variant="tiny" weight="medium" color={theme.text} style={{ marginTop: 6, textAlign: 'center' }} numberOfLines={1}>{label}</AppText>
       </View>
     );
   };
@@ -236,18 +247,22 @@ const ParentProfileScreen = observer(() => {
                 </AppText>
               </View>
 
-              {parent.facilities && (
-                <View style={styles.section}>
-                  <AppText variant="h3" weight="bold" color={theme.text} style={styles.sectionTitle}>Facilities</AppText>
-                  <View style={styles.facilitiesGrid}>
-                    {renderFacility('lift', 'Lift', 'elevator-passenger-outline', 'MaterialCommunityIcons')}
-                    {renderFacility('parking', 'Parking', 'car-outline')}
-                    {renderFacility('generator', 'Generator', 'engine-outline', 'MaterialCommunityIcons')}
-                    {renderFacility('security', 'Security', 'shield-checkmark-outline')}
-                    {renderFacility('solar', 'Solar', 'solar-power-variant-outline', 'MaterialCommunityIcons')}
+              {(() => {
+                const amenitiesList = parseAmenities(parent.amenities);
+                const facilitiesList = parseAmenities(parent.facilities);
+                const allFacilities = Array.from(new Set([...amenitiesList, ...facilitiesList]));
+                
+                if (allFacilities.length === 0) return null;
+
+                return (
+                  <View style={styles.section}>
+                    <AppText variant="h3" weight="bold" color={theme.text} style={styles.sectionTitle}>Facilities</AppText>
+                    <View style={styles.facilitiesGrid}>
+                      {allFacilities.map(label => renderFacility(label))}
+                    </View>
                   </View>
-                </View>
-              )}
+                );
+              })()}
             </>
           ) : (
             <View style={styles.section}>

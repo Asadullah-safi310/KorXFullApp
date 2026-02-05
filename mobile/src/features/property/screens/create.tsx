@@ -114,7 +114,7 @@ const PropertyCreateScreen = observer(() => {
 
           setFormInitialValues({
             ...baseInitialValues,
-            agent_id: String(parent.agent_id || authStore.user?.user_id || ''),
+            agent_id: authStore.user?.role === 'agent' ? String(authStore.user?.person_id || authStore.user?.user_id || '') : '',
             property_type: defaultType,
             purpose: parent.purpose || 'sale',
             province_id: parent.province_id ? String(parent.province_id) : '',
@@ -154,7 +154,7 @@ const PropertyCreateScreen = observer(() => {
       const activeCategory = (category as string || 'tower').toLowerCase();
       setFormInitialValues({
         ...baseInitialValues,
-        agent_id: String(authStore.user?.user_id || ''),
+        agent_id: authStore.user?.role === 'agent' ? String(authStore.user?.person_id || authStore.user?.user_id || '') : '',
         property_category: activeCategory,
         is_parent: true,
         record_kind: 'container',
@@ -179,7 +179,7 @@ const PropertyCreateScreen = observer(() => {
         property_category: 'normal',
         is_parent: false,
         record_kind: 'listing',
-        agent_id: String(authStore.user?.user_id || ''),
+        agent_id: authStore.user?.role === 'agent' ? String(authStore.user?.person_id || authStore.user?.user_id || '') : '',
         media: [],
         existingMedia: [],
         title: '',

@@ -65,7 +65,7 @@ const StepPricing = () => {
                   onChangeText={(t) => setFieldValue(priceField, t)}
                   keyboardType="numeric"
                   placeholder={placeholder}
-                  placeholderTextColor={theme.subtext}
+                  placeholderTextColor={theme.text + '40'}
                 />
               </View>
               <View style={[styles.currencySelector, { backgroundColor: theme.background, borderColor: theme.border }]}>
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   input: { 
     flex: 1, 
-    fontSize: 18, 
+    fontSize: 15, 
     fontFamily: 'Inter-Bold',
   },
   errorText: { 

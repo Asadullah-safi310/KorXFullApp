@@ -258,7 +258,7 @@ const StepDetails = () => {
                     <TextInput 
                       style={[styles.input, { color: theme.text }]}
                       placeholder="e.g. 4B"
-                      placeholderTextColor={theme.subtext}
+                      placeholderTextColor={theme.text + '40'}
                       value={values.unit_number}
                       onChangeText={(text) => setFieldValue('unit_number', text)}
                     />
@@ -277,7 +277,7 @@ const StepDetails = () => {
                 <TextInput 
                   style={[styles.input, { color: theme.text }]}
                   placeholder="e.g. 2nd Floor"
-                  placeholderTextColor={theme.subtext}
+                  placeholderTextColor={theme.text + '40'}
                   value={values.floor}
                   onChangeText={(text) => setFieldValue('floor', text)}
                 />
@@ -297,7 +297,7 @@ const StepDetails = () => {
             value={values.title}
             onChangeText={(t) => setFieldValue('title', t)}
             placeholder="e.g. Modern 3-Bedroom Villa with Pool"
-            placeholderTextColor={theme.subtext}
+            placeholderTextColor={theme.text + '40'}
           />
         </View>
         {renderError('title')}
@@ -311,7 +311,7 @@ const StepDetails = () => {
             value={values.description}
             onChangeText={(t) => setFieldValue('description', t)}
             placeholder="Describe the key features, amenities, and nearby attractions..."
-            placeholderTextColor={theme.subtext}
+            placeholderTextColor={theme.text + '40'}
             multiline
             numberOfLines={5}
             textAlignVertical="top"
@@ -331,7 +331,7 @@ const StepDetails = () => {
                 value={values.area_size}
                 onChangeText={(t) => setFieldValue('area_size', t)}
                 placeholder="1200"
-                placeholderTextColor={theme.subtext}
+                placeholderTextColor={theme.text + '40'}
                 keyboardType="numeric"
               />
               <View style={[styles.unitBadge, { backgroundColor: theme.border + '30' }]}>
@@ -423,7 +423,7 @@ const StepDetails = () => {
                 value={values.location}
                 onChangeText={(t) => setFieldValue('location', t)}
                 placeholder="Street address, building name..."
-                placeholderTextColor={theme.subtext}
+                placeholderTextColor={theme.text + '40'}
               />
             </View>
             {renderError('location')}
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Inter-Medium',
   },
   textArea: {

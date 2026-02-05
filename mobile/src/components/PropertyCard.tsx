@@ -111,32 +111,25 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
     propertyTitle = property.title || `${property.property_category ? property.property_category.charAt(0).toUpperCase() + property.property_category.slice(1) : 'Building'}`;
   }
 
-  const addressCandidates = [
-    property.address,
-    property.location,
-    property.city,
-    property.AreaData?.name,
-    property.ProvinceData?.name,
-  ].filter(Boolean);
-  
-  const uniqueAddressParts: string[] = [];
-  const seenAddress = new Set<string>();
-  
-  addressCandidates.forEach((part) => {
-    // Clean part: remove "District X" or "Nahiya X" (case insensitive)
-    let cleanedPart = part.replace(/(District|Nahiya)\s+\d+/gi, '').trim();
-    // Remove leading/trailing commas and extra spaces
-    cleanedPart = cleanedPart.replace(/^[\s,]+|[\s,]+$/g, '').trim();
-    
-    if (!cleanedPart) return;
+  const addressParts: string[] = [];
+  const areaName = property.AreaData?.name || property.area?.name;
+  const cityName = property.ProvinceData?.name || property.province?.name || property.city;
 
-    const normalized = cleanedPart.toLowerCase();
-    if (!seenAddress.has(normalized)) {
-      seenAddress.add(normalized);
-      uniqueAddressParts.push(cleanedPart);
-    }
-  });
-  const fullAddress = uniqueAddressParts.join(', ');
+  if (areaName) {
+    let cleanedArea = areaName.replace(/(District|Nahiya)\s+\d+/gi, '').trim();
+    cleanedArea = cleanedArea.replace(/^[\s,]+|[\s,]+$/g, '').trim();
+    if (cleanedArea) addressParts.push(cleanedArea);
+  } else if (property.address || property.location) {
+    let addr = (property.address || property.location);
+    let cleanedAddr = addr.replace(/(District|Nahiya)\s+\d+/gi, '').trim();
+    cleanedAddr = cleanedAddr.replace(/^[\s,]+|[\s,]+$/g, '').trim();
+    if (cleanedAddr) addressParts.push(cleanedAddr.split(',')[0].trim());
+  }
+
+  if (cityName) {
+    addressParts.push(cityName);
+  }
+  const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'Location not specified';
 
   const renderImageItem = ({ item }: { item: string }) => (
     <View style={variant === 'compact' ? styles.compactImageContainer : styles.imageContainer}>

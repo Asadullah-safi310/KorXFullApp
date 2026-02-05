@@ -24,6 +24,7 @@ import Animated, {
   Extrapolation 
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
+import { AMENITY_ICONS } from '../../../constants/Amenities';
 
 // Safe import for react-native-maps to prevent crash on environments without native module
 let MapView: any;
@@ -41,28 +42,6 @@ try {
 
 const { width, height } = Dimensions.get('window');
 const HEADER_HEIGHT = 420;
-
-const AMENITY_ICONS: Record<string, { icon: string; provider: 'Ionicons' | 'MaterialCommunityIcons' }> = {
-  'Parking': { icon: 'car-outline', provider: 'Ionicons' },
-  'Security Guard': { icon: 'shield-checkmark-outline', provider: 'Ionicons' },
-  'Central Heating System': { icon: 'thermometer-outline', provider: 'Ionicons' },
-  'Cupboards': { icon: 'closet-outline', provider: 'MaterialCommunityIcons' },
-  'Sunny': { icon: 'sunny-outline', provider: 'Ionicons' },
-  'Basement': { icon: 'stairs-down', provider: 'MaterialCommunityIcons' },
-  'AC': { icon: 'air-conditioner', provider: 'MaterialCommunityIcons' },
-  'Lift': { icon: 'elevator-passenger-outline', provider: 'MaterialCommunityIcons' },
-  'Furnished': { icon: 'chair-rolling', provider: 'MaterialCommunityIcons' },
-  'Semi-Furnished': { icon: 'chair-school', provider: 'MaterialCommunityIcons' },
-  'Solar Facility': { icon: 'solar-power-variant-outline', provider: 'MaterialCommunityIcons' },
-  'Generator Facility': { icon: 'engine-outline', provider: 'MaterialCommunityIcons' },
-  'Electricity': { icon: 'flash-outline', provider: 'Ionicons' },
-  'Water Supply': { icon: 'water-outline', provider: 'Ionicons' },
-  'Gas': { icon: 'flame-outline', provider: 'Ionicons' },
-  'Internet': { icon: 'wifi-outline', provider: 'Ionicons' },
-  'Gym': { icon: 'fitness-outline', provider: 'Ionicons' },
-  'Pool': { icon: 'pool', provider: 'MaterialCommunityIcons' },
-  'Garden': { icon: 'leaf-outline', provider: 'Ionicons' },
-};
 
 const FullscreenViewer = ({ 
   visible, 

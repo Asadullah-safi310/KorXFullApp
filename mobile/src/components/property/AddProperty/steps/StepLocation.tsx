@@ -122,7 +122,7 @@ const StepLocation = () => {
               onChangeText={(v) => setFieldValue('latitude', parseFloat(v) || null)}
               keyboardType="numeric"
               placeholder="0.000000"
-              placeholderTextColor={theme.subtext}
+              placeholderTextColor={theme.text + '40'}
             />
           </View>
         </View>
@@ -135,7 +135,7 @@ const StepLocation = () => {
               onChangeText={(v) => setFieldValue('longitude', parseFloat(v) || null)}
               keyboardType="numeric"
               placeholder="0.000000"
-              placeholderTextColor={theme.subtext}
+              placeholderTextColor={theme.text + '40'}
             />
           </View>
         </View>
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   input: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Inter-SemiBold',
   },
   tipBox: {
