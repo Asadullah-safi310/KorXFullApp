@@ -60,7 +60,11 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
     scale.value = withSpring(1);
   };
 
-  const photos = property.photos && property.photos.length > 0 ? property.photos : [];
+  const photos = (property.photos && property.photos.length > 0) 
+    ? property.photos 
+    : (property.images && property.images.length > 0)
+      ? property.images
+      : [];
   
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const contentOffset = event.nativeEvent.contentOffset.x;
@@ -86,7 +90,8 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
   };
 
   const getPropertyDisplayPrice = (property: any) => {
-    if (property.purpose === 'SALE' || property.purpose === 'BOTH') {
+    const purpose = property.purpose?.toUpperCase();
+    if (purpose === 'SALE' || purpose === 'BOTH' || (isSale && !isRent)) {
       return property.sale_price ? formatPrice(property.sale_price, property.sale_currency) : 'Price on Request';
     }
     return property.rent_price ? `${formatPrice(property.rent_price, property.rent_currency)} / mo` : 'Price on Request';
@@ -97,8 +102,9 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
     ? (property.property_category ? property.property_category.charAt(0).toUpperCase() + property.property_category.slice(1) : 'Building')
     : getPropertyDisplayPrice(property);
   
-  const isSale = !isContainer && (property.is_available_for_sale || property.purpose === 'SALE' || property.purpose === 'BOTH');
-  const isRent = !isContainer && (property.is_available_for_rent || property.purpose === 'RENT' || property.purpose === 'BOTH');
+  const isSale = !!property.forSale || !!property.is_available_for_sale || !!property.for_sale || property.purpose?.toUpperCase() === 'SALE' || property.purpose?.toUpperCase() === 'BOTH';
+  const isRent = !!property.forRent || !!property.is_available_for_rent || !!property.for_rent || property.purpose?.toUpperCase() === 'RENT' || property.purpose?.toUpperCase() === 'BOTH';
+  const isPubliclyAvailable = isSale || isRent;
   
   let propertyTitle = property.title || property.property_type || 'Modern Living Space';
   if (property.parent_property_id) {
@@ -132,30 +138,40 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
   const fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'Location not specified';
 
   const renderImageItem = ({ item }: { item: string }) => (
-    <View style={variant === 'compact' ? styles.compactImageContainer : styles.imageContainer}>
+    <Pressable 
+      onPress={onPress}
+      style={variant === 'compact' ? styles.compactImageContainer : styles.imageContainer}
+    >
       <Image 
         source={{ uri: getImageUrl(item) || undefined }} 
         style={variant === 'compact' ? styles.compactImage : styles.image} 
         contentFit="cover"
         transition={300}
       />
-    </View>
+    </Pressable>
   );
 
   const PaginationDots = ({ length, active }: { length: number; active: number }) => {
     if (length <= 1) return null;
     return (
-      <View style={styles.paginationDots}>
-        {Array.from({ length: Math.min(length, 8) }).map((_, i) => (
-          <View 
-            key={i} 
-            style={[
-              styles.dot, 
-              { backgroundColor: i === active ? themeColors.white : 'rgba(255,255,255,0.5)' },
-              i === active && { width: 12 }
-            ]} 
-          />
-        ))}
+      <View style={styles.paginationContainer}>
+        <View style={styles.paginationDots}>
+          {Array.from({ length: Math.min(length, 6) }).map((_, i) => (
+            <View 
+              key={i} 
+              style={[
+                styles.dot, 
+                { backgroundColor: i === active ? themeColors.white : 'rgba(255,255,255,0.4)' },
+                i === active && { width: 14, backgroundColor: themeColors.white }
+              ]} 
+            />
+          ))}
+        </View>
+        <View style={styles.countBadge}>
+          <AppText variant="tiny" weight="bold" color={themeColors.white}>
+            {active + 1}/{length}
+          </AppText>
+        </View>
       </View>
     );
   };
@@ -172,9 +188,7 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
         entering={FadeInDown.delay(index * 100).duration(500)}
         style={[animatedStyle]}
       >
-        <TouchableOpacity 
-          activeOpacity={0.92}
-          onPress={onPress}
+        <View 
           style={[styles.compactCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
         >
           <View style={styles.compactMedia}>
@@ -189,25 +203,29 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
                 style={styles.compactFlatList}
+                nestedScrollEnabled={true}
               />
             ) : (
-              <Image source={DefaultPropertyImage} style={styles.compactImage} contentFit="cover" />
+              <Pressable onPress={onPress}>
+                <Image source={DefaultPropertyImage} style={styles.compactImage} contentFit="cover" />
+              </Pressable>
             )}
             
             <View style={styles.compactImageOverlay} />
             
-            <View style={styles.compactBadgeRow}>
-              {(isSale || isRent) && (
-                <View style={styles.availabilityDot} />
-              )}
+            {isPubliclyAvailable && (
+              <View style={[styles.availabilityDotAbsolute, { backgroundColor: themeColors.success, top: 12, left: 12, right: 'auto' }]} />
+            )}
+
+            <View style={[styles.compactBadgeRow, { left: 34 }]}>
               {isSale && (
-                <View style={[styles.compactTag, { backgroundColor: '#e0f2ff' }]}> 
-                  <AppText variant="caption" weight="bold" color="#0369a1">For Sale</AppText>
+                <View style={[styles.compactTag, { backgroundColor: themeColors.primary }]}> 
+                  <AppText variant="tiny" weight="bold" color={themeColors.white}>Sale</AppText>
                 </View>
               )}
               {isRent && (
-                <View style={[styles.compactTag, { backgroundColor: '#ecfccb' }]}> 
-                  <AppText variant="caption" weight="bold" color="#166534">For Rent</AppText>
+                <View style={[styles.compactTag, { backgroundColor: themeColors.success }]}> 
+                  <AppText variant="tiny" weight="bold" color={themeColors.white}>Rent</AppText>
                 </View>
               )}
             </View>
@@ -215,61 +233,64 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
             <PaginationDots length={photos.length} active={activeIndex} />
 
             <TouchableOpacity 
-              style={[styles.compactFavorite, { right: 52 }]} 
+              style={[styles.compactFavorite, { top: 12, right: 52, backgroundColor: 'rgba(255,255,255,0.9)' }]} 
               onPress={(e) => {
                 e.stopPropagation();
                 shareProperty(property);
               }}
               activeOpacity={0.7}
             >
-              <Ionicons name="share-social-outline" size={18} color={themeColors.white} />
+              <Ionicons name="share-social-outline" size={18} color={themeColors.text} />
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.compactFavorite} 
+              style={[styles.compactFavorite, { top: 12, right: 12, backgroundColor: 'rgba(255,255,255,0.9)' }]} 
               onPress={toggleFavorite}
               activeOpacity={0.7}
             >
-              <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? themeColors.danger : themeColors.white} />
+              <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? themeColors.danger : themeColors.text} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.compactBody}>
+          <Pressable 
+            onPress={onPress}
+            style={styles.compactBody}
+          >
             <View style={styles.compactHeaderRow}>
-              <AppText variant="body" weight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 10 }}>
+              <AppText variant="small" weight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 10 }}>
                 {property.parent_property_id && property.unit_number ? `Unit ${property.unit_number}` : locationLabel}
               </AppText>
               <View style={[styles.compactTypeBadge, { backgroundColor: themeColors.background }]}> 
-                <AppText variant="caption" weight="bold" color={themeColors.subtext} numberOfLines={1}>
+                <AppText variant="tiny" weight="bold" color={themeColors.subtext} numberOfLines={1}>
                   {typeLabel}
                 </AppText>
               </View>
             </View>
-            <AppText variant="title" weight="bold" color={themeColors.primary} numberOfLines={1} style={{ marginBottom: 8 }}>
+            <AppText variant="small" weight="bold" color={themeColors.primary} numberOfLines={1} style={{ marginBottom: 8 }}>
               {displayPrice}
             </AppText>
             <View style={styles.compactMetaRow}>
               {isContainer ? (
                 <View style={styles.compactMetaItem}>
                   <Ionicons name="business-outline" size={14} color={themeColors.subtext} />
-                  <AppText variant="small" weight="medium">{property.total_children || 0} Units</AppText>
+                  <AppText variant="tiny" weight="medium">{property.total_children || 0} Units</AppText>
                 </View>
               ) : (
                 <>
                   <View style={styles.compactMetaItem}>
                     <Ionicons name="bed-outline" size={14} color={themeColors.subtext} />
-                    <AppText variant="small" weight="medium">{bedLabel} BHK</AppText>
+                    <AppText variant="tiny" weight="medium">{bedLabel} BHK</AppText>
                   </View>
                   <View style={[styles.compactSeparator, { backgroundColor: themeColors.border }]} />
                   <View style={styles.compactMetaItem}>
                     <MaterialCommunityIcons name="vector-square" size={14} color={themeColors.subtext} />
-                    <AppText variant="small" weight="medium">{areaLabel} sqft</AppText>
+                    <AppText variant="tiny" weight="medium">{areaLabel} sqft</AppText>
                   </View>
                 </>
               )}
             </View>
-          </View>
-        </TouchableOpacity>
+          </Pressable>
+        </View>
       </Animated.View>
     );
   }
@@ -279,15 +300,16 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
       entering={FadeInDown.delay(index * 100).duration(500)}
       style={[animatedStyle]}
     >
-      <Pressable 
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={onPress}
-        style={({ pressed }) => [
+      <View 
+        style={[
           styles.container, 
           { 
             backgroundColor: themeColors.card, 
             borderColor: themeColors.border,
+            borderWidth: 1,
+            borderRadius: 20,
+            overflow: 'hidden',
+            marginBottom: 20,
           }
         ]}
       >
@@ -304,63 +326,64 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
               onScroll={handleScroll}
               scrollEventThrottle={16}
               style={styles.flatList}
+              nestedScrollEnabled={true}
             />
           ) : (
-            <Image source={DefaultPropertyImage} style={styles.image} contentFit="cover" />
+            <Pressable onPress={onPress}>
+              <Image source={DefaultPropertyImage} style={styles.image} contentFit="cover" />
+            </Pressable>
           )}
 
-          {photos.length > 1 && (
-            <View style={styles.imageCountBadge}>
-              <AppText variant="caption" weight="bold" color={themeColors.white}>{activeIndex + 1}/{photos.length}</AppText>
-            </View>
+          {isPubliclyAvailable && (
+            <View style={[styles.availabilityDotAbsolute, { backgroundColor: themeColors.success, top: 16, left: 16, right: 'auto' }]} />
           )}
 
           <PaginationDots length={photos.length} active={activeIndex} />
           
-          <View style={styles.badgeRow}>
-            {(isSale || isRent) && (
-              <View style={[styles.availabilityDot, { borderColor: themeColors.white, backgroundColor: themeColors.success }]} />
-            )}
+          <View style={[styles.badgeRow, { left: 38 }]}>
             {isSale && (
-              <View style={[styles.statusTag, { backgroundColor: themeColors.infoSubtle }]}> 
-                <AppText variant="caption" weight="bold" color={themeColors.infoText}>For Sale</AppText>
+              <View style={[styles.statusTag, { backgroundColor: themeColors.primary }]}> 
+                <AppText variant="tiny" weight="bold" color={themeColors.white}>Sale</AppText>
               </View>
             )}
             {isRent && (
-              <View style={[styles.statusTag, { backgroundColor: themeColors.successSubtle }]}> 
-                <AppText variant="caption" weight="bold" color={themeColors.successText}>For Rent</AppText>
+              <View style={[styles.statusTag, { backgroundColor: themeColors.success }]}> 
+                <AppText variant="tiny" weight="bold" color={themeColors.white}>Rent</AppText>
               </View>
             )}
           </View>
 
           <TouchableOpacity 
-            style={[styles.favoriteBtn, { right: 62, backgroundColor: themeColors.white }]}
+            style={[styles.favoriteBtn, { top: 16, right: 62, backgroundColor: 'rgba(255,255,255,0.9)' }]}
             activeOpacity={0.8}
             onPress={(e) => {
               e.stopPropagation();
               shareProperty(property);
             }}
           >
-            <Ionicons name="share-social-outline" size={18} color={themeColors.mutedText} />
+            <Ionicons name="share-social-outline" size={18} color={themeColors.text} />
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.favoriteBtn, { backgroundColor: themeColors.white }]}
+            style={[styles.favoriteBtn, { top: 16, right: 16, backgroundColor: 'rgba(255,255,255,0.9)' }]}
             activeOpacity={0.8}
             onPress={toggleFavorite}
           >
-            <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? themeColors.danger : themeColors.mutedText} />
+            <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? themeColors.danger : themeColors.text} />
           </TouchableOpacity>
         </View>
 
         {/* Info Section */}
-        <View style={styles.infoSection}>
+        <Pressable 
+          onPress={onPress}
+          style={styles.infoSection}
+        >
           <View style={styles.priceRow}>
             <View style={styles.priceContainer}>
-              <AppText variant="title" weight="bold" numberOfLines={1} color={isContainer ? themeColors.text : themeColors.primary}> 
+              <AppText variant="small" weight="bold" numberOfLines={1} color={isContainer ? themeColors.text : themeColors.primary}> 
                 {displayPrice}
                 {!isContainer && (
-                  <AppText variant="caption" color={themeColors.mutedText}> / {isRent && !isSale ? 'mo' : 'yr'}</AppText>
+                  <AppText variant="tiny" color={themeColors.mutedText}> / {isRent && !isSale ? 'mo' : 'yr'}</AppText>
                 )}
               </AppText>
             </View>
@@ -371,7 +394,7 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
           </View>
 
           <View style={styles.titleRow}>
-            <AppText variant="body" weight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 12 }}>
+            <AppText variant="tiny" weight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 12 }}>
               {propertyTitle}
             </AppText>
             
@@ -396,14 +419,14 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
             </View>
           </View>
           
-          <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={16} color={themeColors.mutedText} />
-            <AppText variant="small" color={themeColors.subtext || themeColors.mutedText} numberOfLines={1} style={{ marginLeft: 4, flex: 1 }}>
-              {fullAddress || 'Location details'}
-            </AppText>
-          </View>
-        </View>
-      </Pressable>
+            <View style={styles.locationRow}>
+              <Ionicons name="location-outline" size={14} color={themeColors.mutedText} />
+              <AppText variant="tiny" color={themeColors.mutedText} numberOfLines={1} style={{ flex: 1 }}>
+                {fullAddress || 'Location details'}
+              </AppText>
+            </View>
+        </Pressable>
+      </View>
     </Animated.View>
   );
 });
@@ -461,9 +484,25 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   statusTag: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  availabilityDotAbsolute: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 16,
+    height: 16,
     borderRadius: 8,
+    borderWidth: 2.5,
+    borderColor: '#fff',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
   availabilityDot: {
     width: 12,
@@ -472,9 +511,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   compactTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   compactTagText: {
     fontSize: 11,
@@ -483,7 +522,7 @@ const styles = StyleSheet.create({
   },
   compactFavorite: {
     position: 'absolute',
-    top: 12,
+    top: 40,
     right: 12,
     width: 36,
     height: 36,
@@ -558,39 +597,46 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  paginationDots: {
+  paginationContainer: {
     position: 'absolute',
     bottom: 12,
-    width: '100%',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  paginationDots: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 4,
-    zIndex: 2,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  countBadge: {
+    position: 'absolute',
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-  },
-  imageCountBadge: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    zIndex: 2,
-  },
-  imageCountText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
   },
   favoriteBtn: {
     position: 'absolute',
-    top: 16,
+    top: 44,
     right: 16,
     width: 38,
     height: 38,

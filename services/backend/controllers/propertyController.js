@@ -36,6 +36,8 @@ const createProperty = async (req, res) => {
       description, 
       latitude, 
       longitude,
+      is_available_for_sale,
+      is_available_for_rent,
       facilities,
       details,
       title,
@@ -90,6 +92,8 @@ const createProperty = async (req, res) => {
       title,
       unit_number,
       floor,
+      is_available_for_sale: !!is_available_for_sale,
+      is_available_for_rent: !!is_available_for_rent,
       facilities: facilities || null,
       details: details || {},
       photos: photos || [],
@@ -142,7 +146,9 @@ const getProperties = async (req, res) => {
       return {
         ...propJson,
         id: propJson.property_id,
-        current_owner: propJson.Owner
+        current_owner: propJson.Owner,
+        forSale: !!propJson.is_available_for_sale,
+        forRent: !!propJson.is_available_for_rent
       };
     });
 
@@ -183,7 +189,9 @@ const getPropertyById = async (req, res) => {
     const enrichedProperty = {
       ...propJson,
       id: propJson.property_id,
-      current_owner: propJson.Owner
+      current_owner: propJson.Owner,
+      forSale: !!propJson.is_available_for_sale,
+      forRent: !!propJson.is_available_for_rent
     };
 
     res.json(enrichedProperty);
@@ -298,7 +306,9 @@ const searchProperties = async (req, res) => {
       return {
         ...propJson,
         id: propJson.property_id,
-        current_owner: propJson.Owner
+        current_owner: propJson.Owner,
+        forSale: !!propJson.is_available_for_sale,
+        forRent: !!propJson.is_available_for_rent
       };
     });
 
@@ -334,6 +344,8 @@ const updateProperty = async (req, res) => {
       floor,
       facilities, 
       details,
+      is_available_for_sale,
+      is_available_for_rent,
       status
     } = req.body;
 
@@ -360,6 +372,8 @@ const updateProperty = async (req, res) => {
       floor: floor !== undefined ? floor : property.floor,
       sale_price: sale_price !== undefined ? sale_price : property.sale_price,
       rent_price: rent_price !== undefined ? rent_price : property.rent_price,
+      is_available_for_sale: is_available_for_sale !== undefined ? !!is_available_for_sale : property.is_available_for_sale,
+      is_available_for_rent: is_available_for_rent !== undefined ? !!is_available_for_rent : property.is_available_for_rent,
       area_size: area_size !== undefined ? area_size : property.area_size,
       description: description !== undefined ? description : property.description,
       details: details !== undefined ? details : property.details,

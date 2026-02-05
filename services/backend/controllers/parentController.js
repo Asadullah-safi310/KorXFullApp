@@ -206,6 +206,8 @@ const getParentChildren = async (req, res) => {
     const enrichedChildren = children.map(child => {
       const c = child.toJSON();
       c.id = c.property_id;
+      c.forSale = !!c.is_available_for_sale;
+      c.forRent = !!c.is_available_for_rent;
       return c;
     });
 
@@ -238,6 +240,8 @@ const createChild = async (req, res) => {
       bathrooms,
       unit_number,
       floor,
+      is_available_for_sale,
+      is_available_for_rent,
       details
     } = req.body;
 
@@ -287,6 +291,8 @@ const createChild = async (req, res) => {
       bathrooms: activeBathrooms,
       unit_number,
       floor,
+      is_available_for_sale: !!is_available_for_sale,
+      is_available_for_rent: !!is_available_for_rent,
       details: details || {},
       created_by_user_id: req.user.user_id,
       status: 'active',

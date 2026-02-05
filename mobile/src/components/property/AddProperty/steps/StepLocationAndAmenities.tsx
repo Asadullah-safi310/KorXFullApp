@@ -156,7 +156,7 @@ const StepLocationAndAmenities = () => {
               {loadingProvinces ? <ActivityIndicator size="small" color={theme.primary} /> : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
                   {provinces.map((p) => {
-                    const isSelected = values.province_id === p.id || values.provinceId === p.id;
+                    const isSelected = values.province_id == p.id || values.provinceId == p.id;
                     return (
                       <TouchableOpacity 
                         key={p.id} 
@@ -185,7 +185,7 @@ const StepLocationAndAmenities = () => {
                 {loadingDistricts ? <ActivityIndicator size="small" color={theme.primary} /> : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
                     {districts.map((d) => {
-                      const isSelected = values.district_id === d.id || values.districtId === d.id;
+                      const isSelected = values.district_id == d.id || values.districtId == d.id;
                       return (
                         <TouchableOpacity 
                           key={d.id} 
@@ -214,7 +214,7 @@ const StepLocationAndAmenities = () => {
                 {loadingAreas ? <ActivityIndicator size="small" color={theme.primary} /> : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
                     {areas.map((a) => {
-                      const isSelected = values.area_id === a.id || values.areaId === a.id;
+                      const isSelected = values.area_id == a.id || values.areaId == a.id;
                       return (
                         <TouchableOpacity 
                           key={a.id} 
