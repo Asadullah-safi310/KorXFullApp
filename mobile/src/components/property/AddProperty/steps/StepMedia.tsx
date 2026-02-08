@@ -114,8 +114,13 @@ const StepMedia = () => {
                     onPress: () => {
                         const currentExisting = Array.isArray(values.existingMedia) ? values.existingMedia : [];
                         const existing = [...currentExisting];
+                        const deletedItem = existing[index];
                         existing.splice(index, 1);
                         setFieldValue('existingMedia', existing);
+                        
+                        // Track deleted media URL for backend deletion
+                        const currentDeleted = Array.isArray(values.deletedMedia) ? values.deletedMedia : [];
+                        setFieldValue('deletedMedia', [...currentDeleted, deletedItem.url]);
                     } 
                 }
             ]
@@ -130,7 +135,7 @@ const StepMedia = () => {
 
   const renderMediaItem = (item: any, index: number, isExisting: boolean) => (
     <View key={isExisting ? `ext-${index}` : `new-${index}`} style={styles.mediaWrapper}>
-      <View style={[styles.mediaItemContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={[styles.mediaItemContainer, { backgroundColor: 'transparent', borderColor: theme.border }]}>
         {item.category === 'image' || isExisting ? (
           <Image source={{ uri: isExisting ? getImageUrl(item.url) : item.uri }} style={styles.mediaPreview} />
         ) : (
@@ -185,7 +190,7 @@ const StepMedia = () => {
         
         <View style={styles.secondaryUploads}>
           <TouchableOpacity 
-            style={[styles.smallUploadCard, { backgroundColor: theme.card, borderColor: theme.border }]} 
+            style={[styles.smallUploadCard, { backgroundColor: 'transparent', borderColor: theme.border }]} 
             onPress={() => handlePickOtherMedia('video')}
             activeOpacity={0.7}
           >
@@ -194,7 +199,7 @@ const StepMedia = () => {
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.smallUploadCard, { backgroundColor: theme.card, borderColor: theme.border }]} 
+            style={[styles.smallUploadCard, { backgroundColor: 'transparent', borderColor: theme.border }]} 
             onPress={() => handlePickOtherMedia('attachment')}
             activeOpacity={0.7}
           >

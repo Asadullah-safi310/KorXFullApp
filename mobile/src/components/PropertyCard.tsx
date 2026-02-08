@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Pressable, FlatList, Dimensions, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Pressable, FlatList, Dimensions, NativeScrollEvent, NativeSyntheticEvent, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -32,7 +32,7 @@ interface PropertyCardProps {
   property: any;
   onPress: () => void;
   index?: number;
-  variant?: 'default' | 'compact';
+  variant?: 'default' | 'compact' | 'horizontal';
 }
 
 const PropertyCard = observer(({ property, onPress, index = 0, variant = 'default' }: PropertyCardProps) => {
@@ -76,11 +76,25 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
     cardScale.value = withSpring(1, springConfig);
   };
 
-  const photos = (property.photos && property.photos.length > 0) 
+  let rawPhotos = (property.photos && property.photos.length > 0) 
     ? property.photos 
     : (property.images && property.images.length > 0)
       ? property.images
       : [];
+  
+  // Handle stringified JSON if it comes from backend as a string
+  if (typeof rawPhotos === 'string') {
+    try {
+      rawPhotos = JSON.parse(rawPhotos);
+    } catch {
+      rawPhotos = [];
+    }
+  }
+
+  // Ensure we have an array of strings (URLs/Paths)
+  const photos = Array.isArray(rawPhotos) 
+    ? rawPhotos.map(p => typeof p === 'string' ? p : p.url).filter(Boolean)
+    : [];
   
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const contentOffset = event.nativeEvent.contentOffset.x;
@@ -106,11 +120,24 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
   };
 
   const getPropertyDisplayPrice = (property: any) => {
-    const purpose = property.purpose?.toUpperCase();
-    if (purpose === 'SALE' || purpose === 'BOTH' || (isSale && !isRent)) {
+    // Determine display based on availability flags
+    const isSaleAvailable = !!property.forSale || !!property.is_available_for_sale || !!property.for_sale || !!property.isAvailableForSale;
+    const isRentAvailable = !!property.forRent || !!property.is_available_for_rent || !!property.for_rent || !!property.isAvailableForRent;
+    
+    // If only for sale, show sale price
+    if (isSaleAvailable && !isRentAvailable) {
       return property.sale_price ? formatPrice(property.sale_price, property.sale_currency) : 'Price on Request';
     }
-    return property.rent_price ? `${formatPrice(property.rent_price, property.rent_currency)} / mo` : 'Price on Request';
+    // If only for rent, show rent price
+    if (isRentAvailable && !isSaleAvailable) {
+      return property.rent_price ? `${formatPrice(property.rent_price, property.rent_currency)} / mo` : 'Price on Request';
+    }
+    // If both, prioritize sale price
+    if (isSaleAvailable && isRentAvailable) {
+      return property.sale_price ? formatPrice(property.sale_price, property.sale_currency) : 
+             property.rent_price ? `${formatPrice(property.rent_price, property.rent_currency)} / mo` : 'Price on Request';
+    }
+    return 'Price on Request';
   };
 
   const isContainer = property.record_kind === 'container';
@@ -118,8 +145,9 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
     ? (property.property_category ? property.property_category.charAt(0).toUpperCase() + property.property_category.slice(1) : 'Building')
     : getPropertyDisplayPrice(property);
   
-  const isSale = !!property.forSale || !!property.is_available_for_sale || !!property.for_sale || !!property.isAvailableForSale || property.purpose?.toLowerCase() === 'sale' || property.purpose?.toLowerCase() === 'both';
-  const isRent = !!property.forRent || !!property.is_available_for_rent || !!property.for_rent || !!property.isAvailableForRent || property.purpose?.toLowerCase() === 'rent' || property.purpose?.toLowerCase() === 'both';
+  // Check availability flags ONLY - do not use purpose field as it's not the same
+  const isSale = !!property.forSale || !!property.is_available_for_sale || !!property.for_sale || !!property.isAvailableForSale;
+  const isRent = !!property.forRent || !!property.is_available_for_rent || !!property.for_rent || !!property.isAvailableForRent;
   const isPubliclyAvailable = isSale || isRent;
   
   let propertyTitle = property.title || property.property_type || 'Modern Living Space';
@@ -191,6 +219,116 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
       </View>
     );
   };
+
+  // Horizontal variant matching the attached image
+  if (variant === 'horizontal') {
+    const bedLabel = property.bedrooms || 3;
+    const bathLabel = property.bathrooms || 2;
+    const areaLabel = property.area_size || 130;
+    const viewCount = property.view_count || Math.floor(Math.random() * 30) + 1;
+
+    return (
+      <View style={styles.cardWrapper}>
+        <Pressable
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          onPress={onPress}
+        >
+          <Animated.View 
+            entering={FadeInDown.delay(index * 100).duration(500)}
+            style={[cardAnimatedStyle]}
+          >
+            <View 
+              style={[styles.horizontalCard, { backgroundColor: '#fff' }]}
+            >
+              {/* Image Section */}
+              <View style={styles.horizontalImageContainer}>
+                {photos.length > 0 ? (
+                  <Image 
+                    source={{ uri: getImageUrl(photos[0]) }} 
+                    style={styles.horizontalImage} 
+                    contentFit="cover"
+                    transition={300}
+                    placeholder={DefaultPropertyImage}
+                  />
+                ) : (
+                  <Image 
+                    source={DefaultPropertyImage}
+                    style={styles.horizontalImage} 
+                    contentFit="cover"
+                  />
+                )}
+                {/* View count badge */}
+                <View style={styles.viewCountBadge}>
+                  <Ionicons name="eye-outline" size={12} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold', marginLeft: 4 }}>
+                    {viewCount}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Content Section */}
+              <View style={styles.horizontalContent}>
+                {/* Title and favorite */}
+                <View style={styles.horizontalHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#000', marginBottom: 4 }} numberOfLines={1}>
+                      {propertyTitle}
+                    </Text>
+                    <View style={styles.horizontalLocation}>
+                      <Ionicons name="location" size={12} color="#666" />
+                      <Text style={{ fontSize: 11, color: '#666', flex: 1, marginLeft: 2 }} numberOfLines={1}>
+                        {fullAddress}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={toggleFavorite}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Animated.View style={heartAnimatedStyle}>
+                      <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={20} color={isFavorite ? themeColors.danger : "#999"} />
+                    </Animated.View>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Metadata row */}
+                <View style={styles.horizontalMetaRow}>
+                  {!isContainer ? (
+                    <>
+                      <View style={styles.horizontalMetaItem}>
+                        <Ionicons name="bed-outline" size={16} color="#333" />
+                        <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: '600', color: '#333' }}>{bedLabel}</Text>
+                      </View>
+                      <View style={styles.horizontalMetaItem}>
+                        <MaterialCommunityIcons name="shower" size={16} color="#333" />
+                        <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: '600', color: '#333' }}>{bathLabel}</Text>
+                      </View>
+                      <View style={styles.horizontalMetaItem}>
+                        <MaterialCommunityIcons name="ruler-square" size={16} color="#333" />
+                        <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: '600', color: '#333' }}>{areaLabel}</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={styles.horizontalMetaItem}>
+                      <Ionicons name="business-outline" size={16} color="#333" />
+                      <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: '600', color: '#333' }}>{property.total_children || 0} Units</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Price */}
+                <Text style={{ marginTop: 6, fontSize: 16, fontWeight: 'bold', color: themeColors.primary }} numberOfLines={1}>
+                  {displayPrice}
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (variant === 'compact') {
     const displayPrice = getPropertyDisplayPrice(property);
@@ -276,18 +414,11 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
             </View>
 
             <View style={styles.compactBody}>
-              <View style={styles.compactHeaderRow}>
-                <AppText variant="small" weight="bold" numberOfLines={1} style={{ flex: 1, marginRight: 10 }}>
-                  {property.parent_property_id && property.unit_number ? `Unit ${property.unit_number}` : locationLabel}
-                </AppText>
-                <View style={[styles.compactTypeBadge, { backgroundColor: themeColors.background }]}> 
-                  <AppText variant="tiny" weight="bold" color={themeColors.subtext} numberOfLines={1}>
-                    {typeLabel}
-                  </AppText>
-                </View>
-              </View>
-              <AppText variant="small" weight="bold" color={themeColors.primary} numberOfLines={1} style={{ marginBottom: 8 }}>
-                {displayPrice}
+              <AppText variant="body" weight="bold" numberOfLines={1} style={{ marginBottom: 4 }}>
+                {propertyTitle}
+              </AppText>
+              <AppText variant="tiny" color={themeColors.subtext} numberOfLines={1} style={{ marginBottom: 8 }}>
+                {property.parent_property_id && property.unit_number ? `${typeLabel} in ${fullAddress}` : fullAddress}
               </AppText>
               <View style={styles.compactMetaRow}>
                 {isContainer ? (
@@ -299,16 +430,19 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
                   <>
                     <View style={styles.compactMetaItem}>
                       <Ionicons name="bed-outline" size={14} color={themeColors.subtext} />
-                      <AppText variant="tiny" weight="medium">{bedLabel} BHK</AppText>
+                      <AppText variant="tiny" weight="medium">{bedLabel}</AppText>
                     </View>
                     <View style={[styles.compactSeparator, { backgroundColor: themeColors.border }]} />
                     <View style={styles.compactMetaItem}>
                       <MaterialCommunityIcons name="vector-square" size={14} color={themeColors.subtext} />
-                      <AppText variant="tiny" weight="medium">{areaLabel} sqft</AppText>
+                      <AppText variant="tiny" weight="medium">{areaLabel}</AppText>
                     </View>
                   </>
                 )}
               </View>
+              <AppText variant="body" weight="bold" color={themeColors.primary} numberOfLines={1} style={{ marginTop: 8 }}>
+                {displayPrice}
+              </AppText>
             </View>
           </View>
         </Animated.View>
@@ -458,20 +592,23 @@ const PropertyCard = observer(({ property, onPress, index = 0, variant = 'defaul
 });
 
 const styles = StyleSheet.create({
+  cardWrapper: {
+    width: '100%',
+  },
   container: {
     borderRadius: 16,
     marginBottom: 24,
     overflow: 'hidden',
   },
   compactCard: {
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    marginBottom: 20,
-    width: SCREEN_WIDTH - 40,
+    marginBottom: 0,
+    width: '100%',
   },
   compactMedia: {
-    height: 190,
+    height: 180,
     width: '100%',
     position: 'relative',
   },
@@ -480,8 +617,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   compactImageContainer: {
-    width: SCREEN_WIDTH - 40,
-    height: 190,
+    width: '100%',
+    height: 180,
   },
   compactImage: {
     width: '100%',
@@ -559,7 +696,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   compactBody: {
-    padding: 16,
+    padding: 12,
   },
   compactHeaderRow: {
     flexDirection: 'row',
@@ -745,6 +882,71 @@ const styles = StyleSheet.create({
   location: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  // Horizontal variant styles
+  horizontalCard: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    minHeight: 140,
+  },
+  horizontalImageContainer: {
+    width: 140,
+    height: 140,
+    position: 'relative',
+    backgroundColor: '#f0f0f0',
+  },
+  horizontalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  viewCountBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  horizontalContent: {
+    flex: 1,
+    padding: 10,
+    paddingRight: 12,
+    justifyContent: 'space-between',
+  },
+  horizontalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  horizontalLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  horizontalFavorite: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  horizontalMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 4,
+  },
+  horizontalMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
 

@@ -20,7 +20,7 @@ const ToggleCard = ({ label, value, onValueChange, icon, description }: any) => 
   return (
     <View style={[
       styles.toggleCard, 
-      { backgroundColor: theme.card, borderColor: value ? theme.primary : theme.border }
+      { backgroundColor: 'transparent', borderColor: value ? theme.primary : theme.border }
     ]}>
       <View style={styles.toggleHeader}>
         <View style={[styles.iconContainer, { backgroundColor: value ? theme.primary + '15' : theme.border + '15' }]}>

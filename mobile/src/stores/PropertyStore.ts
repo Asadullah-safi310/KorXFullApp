@@ -230,10 +230,20 @@ class PropertyStore {
 
   updateProperty = async (id: string | number, propertyData: any) => {
     try {
+      console.log('========== UPDATE PROPERTY (Store) ==========');
+      console.log('Property ID:', id);
+      console.log('Property data:', JSON.stringify(propertyData, null, 2));
+      
       const response = await propertyService.updateProperty(id, propertyData);
+      
+      console.log('✓ Update successful (Store)');
       this.fetchProperties(true); // Refresh the list
       return response.data;
     } catch (error: any) {
+      console.error('========== ERROR UPDATE PROPERTY (Store) ==========');
+      console.error('Error:', error);
+      console.error('Error response:', error?.response?.data);
+      console.error('Error message:', error?.message);
       throw error;
     }
   };
@@ -244,6 +254,20 @@ class PropertyStore {
       this.fetchProperties(true);
       return response.data;
     } catch (error: any) {
+      throw error;
+    }
+  };
+
+  deletePropertyMedia = async (id: string | number, mediaUrls: string[]) => {
+    try {
+      console.log('Deleting media:', mediaUrls);
+      const deletePromises = mediaUrls.map((url) => 
+        propertyService.deletePropertyFile(id, url, 'photo')
+      );
+      await Promise.all(deletePromises);
+      console.log('✓ Media deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting media:', error);
       throw error;
     }
   };
@@ -296,9 +320,21 @@ class PropertyStore {
 
   addChildProperty = async (id: string | number, childData: any) => {
     try {
+      console.log('========== ADD CHILD PROPERTY (Store) ==========');
+      console.log('Parent ID:', id);
+      console.log('Child data:', JSON.stringify(childData, null, 2));
+      
       const response = await propertyService.addChildProperty(id, childData);
+      
+      console.log('Response status:', response.status);
+      console.log('Response data:', JSON.stringify(response.data, null, 2));
+      console.log('========== ADD CHILD COMPLETE (Store) ==========');
+      
       return response.data;
     } catch (error: any) {
+      console.error('========== ERROR ADD CHILD (Store) ==========');
+      console.error('Error:', error);
+      console.error('Error response:', error?.response?.data);
       throw error;
     }
   };

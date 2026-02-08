@@ -101,7 +101,7 @@ const StepBasicInfo = observer(() => {
                 activeOpacity={0.7}
                 style={[
                   styles.agentCard,
-                  { backgroundColor: theme.card, borderColor: theme.border },
+                  { backgroundColor: 'transparent', borderColor: theme.border },
                   !values.owner_person_id && { borderColor: theme.primary, backgroundColor: theme.primary + '08' },
                 ]}
                 onPress={() => setFieldValue('owner_person_id', '')}
@@ -121,7 +121,7 @@ const StepBasicInfo = observer(() => {
                     activeOpacity={0.7}
                     style={[
                       styles.agentCard,
-                      { backgroundColor: theme.card, borderColor: theme.border },
+                      { backgroundColor: 'transparent', borderColor: theme.border },
                       isActive && { borderColor: theme.primary, backgroundColor: theme.primary + '08' },
                     ]}
                     onPress={() => setFieldValue('owner_person_id', personId)}

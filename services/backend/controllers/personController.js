@@ -177,8 +177,10 @@ const deletePerson = async (req, res) => {
 const getAgents = async (req, res) => {
   try {
     const agents = await User.findAll({
-      where: { role: 'agent' },
-      attributes: ['user_id', 'full_name', 'phone', 'email'],
+      where: { 
+        role: { [Op.in]: ['agent', 'admin'] } 
+      },
+      attributes: ['user_id', 'full_name', 'phone', 'email', 'profile_picture'],
     });
     res.json(agents);
   } catch (error) {

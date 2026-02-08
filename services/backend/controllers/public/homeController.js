@@ -1,9 +1,10 @@
-const { Property, Province, District, Area } = require('../../models');
+const { Property, Province, District } = require('../../models');
 const { sequelize } = require('../../config/db');
+const { Op } = require('sequelize');
 
 const getHomeContainers = async (req, res) => {
   try {
-    const categories = ['apartment', 'market', 'sharak'];
+    const categories = ['tower', 'market', 'sharak', 'apartment'];
     
     const results = {};
 
@@ -12,7 +13,7 @@ const getHomeContainers = async (req, res) => {
         where: {
           property_category: category,
           parent_id: null,
-          status: 'active',
+          status: { [Op.in]: ['active', 'draft'] },
           record_kind: 'container'
         },
         attributes: [
@@ -69,15 +70,27 @@ const getHomeContainers = async (req, res) => {
           { model: District, as: 'DistrictData', attributes: ['name'] },
         ],
         order: [['createdAt', 'DESC']],
-        limit: 10
+        limit: 20
       });
 
       results[category + 's'] = parents.map(p => {
         const pJson = p.toJSON();
+        
+        let photosArr = [];
+        try {
+          if (Array.isArray(pJson.photos)) {
+            photosArr = pJson.photos;
+          } else if (typeof pJson.photos === 'string' && pJson.photos.length > 0) {
+            photosArr = JSON.parse(pJson.photos);
+          }
+        } catch (e) {
+          photosArr = [];
+        }
+
         return {
           id: pJson.property_id,
           title: pJson.title,
-          images: pJson.photos && pJson.photos.length > 0 ? pJson.photos : ['https://images.unsplash.com/photo-1564013799919-ab600027ffc6'],
+          images: photosArr.length > 0 ? photosArr : ['https://images.unsplash.com/photo-1564013799919-ab600027ffc6'],
           city: pJson.DistrictData?.name || pJson.city,
           province: pJson.ProvinceData?.name,
           availableUnits: parseInt(pJson.availableUnits) || 0,

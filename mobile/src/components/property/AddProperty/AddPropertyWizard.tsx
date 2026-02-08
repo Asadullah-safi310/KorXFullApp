@@ -53,7 +53,7 @@ const ALL_STEPS = [
   { title: 'Final Review', component: StepReview },
 ];
 
-const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, setCurrentStep, steps, isStandalone }: any) => {
+const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, setCurrentStep, steps, isStandalone, isAddingChild, isCreatingParent }: any) => {
   const theme = useThemeColor();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -87,6 +87,8 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
     // ... logic remains unchanged
     try {
       setLoading(true);
+      console.log('========== SUBMIT LISTING START ==========');
+      console.log('Raw values:', JSON.stringify(values, null, 2));
       
       const isInherited = !!(values.parent_property_id || values.parentId || values.apartment_id);
       
@@ -104,39 +106,95 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
         }
       }
 
+      const parentPropertyId = values.parent_property_id || values.parentId || values.apartment_id;
+      const isContainer = !!values.is_parent;
+      const isChild = !!parentPropertyId;
+      
+      // Enforce category logic per requirements:
+      // 1. Parent containers: category must be tower, market, or sharak
+      // 2. Child units: category inherited from parent (tower, market, or sharak)
+      // 3. Standalone: category must be 'normal'
+      let finalCategory = (values.property_category || '').toLowerCase().trim();
+      
+      // Normalize 'apartment' to 'tower'
+      if (finalCategory === 'apartment') {
+        finalCategory = 'tower';
+      }
+      
+      if (isContainer) {
+        // Parent containers: must be tower, market, or sharak
+        if (!['tower', 'market', 'sharak'].includes(finalCategory)) {
+          finalCategory = 'tower'; // Default to tower if invalid
+        }
+      } else if (isChild) {
+        // Child units: inherit category from parent (should already be set correctly)
+        // Category should be tower, market, or sharak based on parent
+        if (!['tower', 'market', 'sharak'].includes(finalCategory)) {
+          finalCategory = 'tower'; // Fallback, though this should not happen if parent data is correct
+        }
+      } else {
+        // Standalone properties: must be 'normal'
+        finalCategory = 'normal';
+      }
+
+      // Enforce record_kind and is_parent per requirements:
+      // - Parent containers: record_kind='container', is_parent=1
+      // - Child units: record_kind='listing', is_parent=0
+      // - Standalone: record_kind='listing', is_parent=0
+      
+      // Helper to convert empty strings to null for integer fields
+      const sanitizeInt = (val: any) => {
+        if (val === '' || val === null || val === undefined) return null;
+        const num = Number(val);
+        return isNaN(num) ? null : num;
+      };
+
       const payload = {
         ...values,
         details,
-        record_kind: values.is_parent ? 'container' : 'listing',
-        property_category: values.property_category,
-        parent_property_id: values.parent_property_id || values.parentId || values.apartment_id,
-        parent_id: values.parent_property_id || values.parentId || values.apartment_id,
+        record_kind: isContainer ? 'container' : 'listing',
+        property_category: finalCategory,
+        is_parent: isContainer, // true for containers, false for listings (child or standalone)
+        parent_property_id: parentPropertyId || null,
+        parent_id: parentPropertyId || null,
         facilities: values.amenities || [],
         amenities: values.amenities || [],
-        area_size: values.is_parent ? null : (values.area_size ? Number(values.area_size) : 0),
-        bedrooms: values.is_parent ? null : (values.bedrooms ? Number(values.bedrooms) : null),
-        bathrooms: values.is_parent ? null : (values.bathrooms ? Number(values.bathrooms) : null),
-        sale_price: values.is_parent ? null : (values.for_sale ? Number(values.sale_price) : null),
-        rent_price: values.is_parent ? null : (values.for_rent ? Number(values.rent_price) : null),
-        is_available_for_sale: values.is_parent ? false : !!values.for_sale,
-        is_available_for_rent: values.is_parent ? false : !!values.for_rent,
+        area_size: isContainer ? null : (values.area_size ? String(values.area_size) : '0'),
+        bedrooms: isContainer ? null : sanitizeInt(values.bedrooms),
+        bathrooms: isContainer ? null : sanitizeInt(values.bathrooms),
+        sale_price: isContainer ? null : (values.for_sale ? sanitizeInt(values.sale_price) : null),
+        rent_price: isContainer ? null : (values.for_rent ? sanitizeInt(values.rent_price) : null),
+        is_available_for_sale: isContainer ? false : !!values.for_sale,
+        is_available_for_rent: isContainer ? false : !!values.for_rent,
         address: values.address || values.location || '',
         location: values.location || values.address || '',
-        province_id: values.province_id ? Number(values.province_id) : null,
-        district_id: values.district_id ? Number(values.district_id) : null,
-        area_id: values.area_id ? Number(values.area_id) : null,
+        province_id: sanitizeInt(values.province_id),
+        district_id: sanitizeInt(values.district_id),
+        area_id: sanitizeInt(values.area_id),
+        agent_id: sanitizeInt(values.agent_id),
+        owner_person_id: sanitizeInt(values.owner_person_id),
       };
 
       let id = propertyId;
       if (isEditing) {
+        console.log('========== UPDATING PROPERTY (Wizard) ==========');
+        console.log('Property ID:', id);
+        console.log('Is Parent?:', payload.is_parent);
+        console.log('Payload:', JSON.stringify(payload, null, 2));
         if (payload.is_parent) {
           await propertyStore.updateParent(id, payload);
         } else {
           await propertyStore.updateProperty(id, payload);
         }
+        console.log('✓ Update successful');
       } else if (payload.parent_property_id) {
+        console.log('========== SUBMITTING CHILD UNIT (Wizard) ==========');
+        console.log('Parent ID:', payload.parent_property_id);
+        console.log('Payload:', JSON.stringify(payload, null, 2));
         const response = await propertyStore.addChildProperty(payload.parent_property_id, payload);
+        console.log('Submission response:', response);
         id = response.property_id || response.id;
+        console.log('Extracted ID:', id);
       } else if (payload.is_parent) {
         const response = await propertyStore.createParent(payload);
         id = response.property_id || response.id;
@@ -158,12 +216,23 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
         await propertyStore.uploadPropertyFiles(id, formData);
       }
 
+      // Delete removed media
+      if (isEditing && values.deletedMedia && values.deletedMedia.length > 0) {
+        await propertyStore.deletePropertyMedia(id, values.deletedMedia);
+      }
+
       Alert.alert('Success', `Property ${isEditing ? 'updated' : 'created'} successfully!`, [
         { text: 'OK', onPress: () => onFinish ? onFinish() : router.back() }
       ]);
     } catch (error: any) {
-      console.error('Submission error:', error);
-      Alert.alert('Error', error?.response?.data?.error || 'Failed to save property. Please check required fields.');
+      console.error('========== SUBMISSION ERROR (Wizard) ==========');
+      console.error('Error:', error);
+      console.error('Error response data:', error?.response?.data);
+      console.error('Error message:', error?.message);
+      console.error('Error status:', error?.response?.status);
+      
+      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to save property. Please check required fields.';
+      Alert.alert('Submission Error', Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg);
     } finally {
       setLoading(false);
     }
@@ -258,6 +327,8 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
             onEditStep={(idx: number) => setCurrentStep(idx)} 
             isStandalone={isStandalone}
             isEditing={isEditing}
+            isAddingChild={isAddingChild}
+            isCreatingParent={isCreatingParent}
           />
         </Animated.View>
       </KeyboardAvoidingView>
@@ -287,7 +358,7 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
             >
               {loading ? <ActivityIndicator color="#fff" /> : (
                 <AppText weight="bold" color="#fff">
-                  {isLastStep ? 'Complete' : 'Continue'}
+                  {isLastStep ? (isEditing ? 'Update' : 'Complete') : 'Continue'}
                 </AppText>
               )}
             </Pressable>
@@ -298,7 +369,7 @@ const WizardInner = observer(({ onFinish, isEditing, propertyId, currentStep, se
   );
 });
 
-const AddPropertyWizard = observer(({ initial, isEditing, propertyId, onFinish, isStandalone }: any) => {
+const AddPropertyWizard = observer(({ initial, isEditing, propertyId, onFinish, isStandalone, isAddingChild, isCreatingParent }: any) => {
   const [currentStep, setCurrentStep] = useState(0);
   const values = initial || initialValues;
   
@@ -325,6 +396,8 @@ const AddPropertyWizard = observer(({ initial, isEditing, propertyId, onFinish, 
         setCurrentStep={setCurrentStep}
         steps={steps}
         isStandalone={isStandalone}
+        isAddingChild={isAddingChild}
+        isCreatingParent={isCreatingParent}
       />
     </Formik>
   );

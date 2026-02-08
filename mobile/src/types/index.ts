@@ -20,7 +20,7 @@ export interface Property {
   agent_id: number | null;
   created_by_user_id: number | null;
   record_kind: 'container' | 'listing';
-  property_category: 'tower' | 'market' | 'sharak' | 'normal';
+  property_category: 'tower' | 'market' | 'sharak' | 'apartment' | 'normal';
   status: 'draft' | 'active' | 'inactive';
   property_type: string;
   purpose: string;

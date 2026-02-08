@@ -13,6 +13,15 @@ const hasPermission = (user, permission) => {
   return false;
 };
 
+// Helper to sanitize integer fields (convert empty strings to null)
+const sanitizeInt = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (value === '' || value === 'null' || value === 'undefined') return null;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? null : parsed;
+};
+
 const createParent = async (req, res) => {
   try {
     const {
@@ -34,44 +43,73 @@ const createParent = async (req, res) => {
       planned_units
     } = req.body;
 
-    // Force property_category validation
-    const allowedParentCategories = ['tower', 'market', 'sharak', 'apartment'];
-    if (!allowedParentCategories.includes(property_category)) {
+    // Sanitize integer fields
+    const sanitizedProvinceId = sanitizeInt(province_id);
+    const sanitizedDistrictId = sanitizeInt(district_id);
+    const sanitizedAreaId = sanitizeInt(area_id);
+    const sanitizedOwnerId = sanitizeInt(owner_person_id);
+    const sanitizedAgentId = sanitizeInt(agent_id);
+    const sanitizedTotalFloors = sanitizeInt(total_floors);
+    const sanitizedPlannedUnits = sanitizeInt(planned_units);
+
+    // Parse facilities to ensure it's a proper JSON array/object
+    let parsedFacilities = facilities;
+    if (facilities !== undefined && facilities !== null) {
+      if (typeof facilities === 'string') {
+        try {
+          parsedFacilities = JSON.parse(facilities);
+        } catch (e) {
+          parsedFacilities = null;
+        }
+      }
+    }
+
+    // Normalize category: 'apartment' -> 'tower'
+    let normalizedCategory = (property_category || '').toLowerCase().trim();
+    if (normalizedCategory === 'apartment') {
+      normalizedCategory = 'tower';
+    }
+
+    // Enforce parent container category rules: must be tower, market, or sharak
+    const allowedParentCategories = ['tower', 'market', 'sharak'];
+    if (!allowedParentCategories.includes(normalizedCategory)) {
       return res.status(400).json({ error: 'Invalid parent category. Must be one of: tower, market, sharak' });
     }
 
     // Permission check
-    const categoryKey = (property_category || '').toUpperCase();
+    const categoryKey = normalizedCategory.toUpperCase();
     if (PERMISSIONS[categoryKey] && !hasPermission(req.user, PERMISSIONS[categoryKey].PARENT_CREATE)) {
-      return res.status(403).json({ error: `Not authorized to create ${property_category} containers` });
+      return res.status(403).json({ error: `Not authorized to create ${normalizedCategory} containers` });
     }
 
     const detailsObj = details || {};
-    if (planned_units) {
-      detailsObj.planned_units = Number(planned_units);
+    if (sanitizedPlannedUnits) {
+      detailsObj.planned_units = sanitizedPlannedUnits;
     }
 
+    // Parent containers: record_kind='container', is_parent=1, category=tower|market|sharak, parent_property_id=NULL
     const parent = await Property.create({
       title,
-      property_category,
-      record_kind: 'container',
-      is_parent: true,
-      parent_id: null,
-      property_type: 'apartment', // Default for containers, though not used much for them
-      province_id,
-      district_id,
-      area_id,
+      property_category: normalizedCategory, // Normalized category (tower, market, or sharak)
+      record_kind: 'container', // Parent containers are containers, not listings
+      is_parent: true, // Parent containers have is_parent=1
+      parent_id: null, // Parent containers have no parent
+      parent_property_id: null, // Parent containers have no parent
+      property_type: normalizedCategory, // Set property_type to match category for containers
+      province_id: sanitizedProvinceId,
+      district_id: sanitizedDistrictId,
+      area_id: sanitizedAreaId,
       address,
       latitude,
       longitude,
       description,
-      facilities,
+      facilities: parsedFacilities,
       photos: photos || [],
       details: detailsObj,
-      owner_person_id: owner_person_id || null,
-      agent_id: agent_id || null,
-      total_floors: total_floors || null,
-      total_units: planned_units || null, // Keep for compatibility if needed, but primary is details
+      owner_person_id: sanitizedOwnerId,
+      agent_id: sanitizedAgentId,
+      total_floors: sanitizedTotalFloors,
+      total_units: sanitizedPlannedUnits, // Keep for compatibility if needed, but primary is details
       created_by_user_id: req.user.user_id,
       status: 'active',
       purpose: null, // Containers must NOT be listed for sale/rent
@@ -221,9 +259,16 @@ const getParentChildren = async (req, res) => {
 const createChild = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('========== CREATE CHILD UNIT ==========');
+    console.log('Parent ID:', id);
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('User:', req.user);
+    
     const parent = await Property.findByPk(id);
+    console.log('Parent found:', parent ? `Yes (${parent.property_category})` : 'No');
 
     if (!parent || parent.record_kind !== 'container') {
+      console.log('ERROR: Parent not found or not a container');
       return res.status(404).json({ error: 'Parent container not found' });
     }
 
@@ -242,21 +287,46 @@ const createChild = async (req, res) => {
       floor,
       is_available_for_sale,
       is_available_for_rent,
-      details
+      details,
+      facilities,
+      amenities
     } = req.body;
+    
+    // Sanitize integer fields
+    const sanitizedBedrooms = sanitizeInt(bedrooms);
+    const sanitizedBathrooms = sanitizeInt(bathrooms);
 
-    // Allowed child types by parent category:
-    // Market -> shop | office
-    // Sharak -> apartment | shop | office | land | house
-    // Tower -> apartment | shop | office
+    // Parse facilities/amenities for unit-specific amenities
+    let unitFacilities = facilities || amenities;
+    if (unitFacilities !== undefined && unitFacilities !== null) {
+      if (typeof unitFacilities === 'string') {
+        try {
+          unitFacilities = JSON.parse(unitFacilities);
+        } catch (e) {
+          unitFacilities = null;
+        }
+      }
+    }
+    
+    console.log('Extracted fields - Title:', title, 'Type:', property_type, 'Purpose:', purpose);
+
     const allowedTypes = {
       tower: ['apartment', 'shop', 'office'],
-      apartment: ['apartment', 'shop', 'office'], // Alias for tower
       market: ['shop', 'office'],
       sharak: ['apartment', 'shop', 'office', 'land', 'house']
     };
 
-    const parentCategory = (parent.property_category || '').toLowerCase();
+    // Normalize parent category: 'apartment' -> 'tower'
+    let parentCategory = (parent.property_category || '').toLowerCase().trim();
+    if (parentCategory === 'apartment') {
+      parentCategory = 'tower';
+    }
+
+    // Ensure parent category is valid
+    if (!['tower', 'market', 'sharak'].includes(parentCategory)) {
+      return res.status(400).json({ error: 'Invalid parent container category' });
+    }
+
     const typeLower = (property_type || '').toLowerCase();
 
     if (!allowedTypes[parentCategory] || !allowedTypes[parentCategory].includes(typeLower)) {
@@ -272,13 +342,17 @@ const createChild = async (req, res) => {
     }
 
     const isTowerOrMarket = parentCategory === 'tower' || parentCategory === 'market';
-    const activeBedrooms = (isTowerOrMarket && typeLower !== 'apartment') ? null : bedrooms;
-    const activeBathrooms = (isTowerOrMarket && typeLower !== 'apartment') ? null : bathrooms;
+    const activeBedrooms = (isTowerOrMarket && typeLower !== 'apartment') ? null : sanitizedBedrooms;
+    const activeBathrooms = (isTowerOrMarket && typeLower !== 'apartment') ? null : sanitizedBathrooms;
 
-    const child = await Property.create({
+    // Child units: record_kind='listing', is_parent=0, category inherited from parent, parent_property_id=parent.id
+    // According to requirements: Child units inherit category from parent container
+    const childData = {
       parent_id: id,
-      property_category: parentCategory,
-      record_kind: 'listing',
+      parent_property_id: id, // Child units must reference parent
+      property_category: parentCategory, // Inherit from parent: tower, market, or sharak (normalized)
+      record_kind: 'listing', // Child units are always listings, not containers
+      is_parent: false, // Child units are never parents (is_parent=0)
       property_type: typeLower,
       title,
       description,
@@ -296,7 +370,7 @@ const createChild = async (req, res) => {
       details: details || {},
       created_by_user_id: req.user.user_id,
       status: 'active',
-      // Inherit from parent
+      // Inherit location from parent container
       province_id: parent.province_id,
       district_id: parent.district_id,
       area_id: parent.area_id,
@@ -304,8 +378,13 @@ const createChild = async (req, res) => {
       latitude: parent.latitude,
       longitude: parent.longitude,
       city: parent.city,
-      facilities: parent.facilities
-    });
+      // Use unit-specific facilities if provided, otherwise inherit from parent
+      facilities: unitFacilities !== undefined ? unitFacilities : parent.facilities
+    };
+    
+    console.log('Creating child with data:', JSON.stringify(childData, null, 2));
+    const child = await Property.create(childData);
+    console.log('Child created successfully! ID:', child.property_id);
 
     const enrichedChild = await Property.findByPk(child.property_id, {
       include: [
@@ -313,6 +392,10 @@ const createChild = async (req, res) => {
         { model: District, as: 'DistrictData', attributes: ['name'] },
       ]
     });
+    
+    console.log('Enriched child fetched:', enrichedChild ? 'Yes' : 'No');
+    console.log('Returning response with property_id:', child.property_id);
+    console.log('========== CREATE CHILD COMPLETE ==========');
 
     res.status(201).json({
       message: 'Unit created successfully',
@@ -321,8 +404,12 @@ const createChild = async (req, res) => {
       property: enrichedChild
     });
   } catch (error) {
-    console.error('Error creating unit:', error);
+    console.error('========== ERROR CREATING CHILD UNIT ==========');
+    console.error('Error details:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
     if (error.name === 'SequelizeValidationError') {
+      console.error('Validation errors:', error.errors.map(e => e.message));
       return res.status(400).json({ error: error.errors.map(e => e.message) });
     }
     res.status(500).json({ error: error.message || 'Internal server error' });
@@ -332,13 +419,20 @@ const createChild = async (req, res) => {
 const updateParent = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('========== UPDATE PARENT CONTAINER ==========');
+    console.log('Parent ID:', id);
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
     const parent = await Property.findByPk(id);
+    console.log('Parent found:', parent ? `Yes (${parent.property_category})` : 'No');
 
     if (!parent || parent.record_kind !== 'container') {
+      console.log('ERROR: Parent not found or not a container');
       return res.status(404).json({ error: 'Container not found' });
     }
 
     if (req.user.role !== 'admin' && parent.created_by_user_id !== req.user.user_id) {
+      console.log('ERROR: Not authorized');
       return res.status(403).json({ error: 'Not authorized to update this container' });
     }
 
@@ -354,27 +448,62 @@ const updateParent = async (req, res) => {
       facilities,
       details,
       status,
-      planned_units
+      planned_units,
+      total_floors,
+      agent_id,
+      owner_person_id
     } = req.body;
 
-    const detailsObj = details || parent.details || {};
-    if (planned_units !== undefined) {
-      detailsObj.planned_units = planned_units ? Number(planned_units) : null;
+    // Sanitize integer fields
+    const sanitizedProvinceId = sanitizeInt(province_id);
+    const sanitizedDistrictId = sanitizeInt(district_id);
+    const sanitizedAreaId = sanitizeInt(area_id);
+    const sanitizedPlannedUnits = sanitizeInt(planned_units);
+    const sanitizedTotalFloors = sanitizeInt(total_floors);
+    const sanitizedAgentId = sanitizeInt(agent_id);
+    const sanitizedOwnerId = sanitizeInt(owner_person_id);
+
+    // Parse facilities to ensure it's a proper JSON array/object
+    let parsedFacilities = facilities;
+    if (facilities !== undefined && facilities !== null) {
+      if (typeof facilities === 'string') {
+        try {
+          parsedFacilities = JSON.parse(facilities);
+        } catch (e) {
+          parsedFacilities = parent.facilities;
+        }
+      }
     }
 
-    await parent.update({
-      title,
-      province_id,
-      district_id,
-      area_id,
-      address,
-      latitude,
-      longitude,
-      description,
-      facilities,
+    const detailsObj = details || parent.details || {};
+    if (sanitizedPlannedUnits !== undefined) {
+      detailsObj.planned_units = sanitizedPlannedUnits;
+    }
+    if (sanitizedTotalFloors !== undefined) {
+      detailsObj.total_floors = sanitizedTotalFloors;
+    }
+
+    const updateData = {
+      title: title !== undefined ? title : parent.title,
+      province_id: sanitizedProvinceId !== undefined ? sanitizedProvinceId : parent.province_id,
+      district_id: sanitizedDistrictId !== undefined ? sanitizedDistrictId : parent.district_id,
+      area_id: sanitizedAreaId !== undefined ? sanitizedAreaId : parent.area_id,
+      address: address !== undefined ? address : parent.address,
+      latitude: latitude !== undefined ? latitude : parent.latitude,
+      longitude: longitude !== undefined ? longitude : parent.longitude,
+      description: description !== undefined ? description : parent.description,
+      facilities: parsedFacilities !== undefined ? parsedFacilities : parent.facilities,
       details: detailsObj,
-      status: status || parent.status
-    });
+      status: status !== undefined ? status : parent.status,
+      total_floors: sanitizedTotalFloors !== undefined ? sanitizedTotalFloors : parent.total_floors,
+      total_units: sanitizedPlannedUnits !== undefined ? sanitizedPlannedUnits : parent.total_units,
+      agent_id: sanitizedAgentId !== undefined ? sanitizedAgentId : parent.agent_id,
+      owner_person_id: sanitizedOwnerId !== undefined ? sanitizedOwnerId : parent.owner_person_id
+    };
+
+    console.log('Update data:', JSON.stringify(updateData, null, 2));
+    await parent.update(updateData);
+    console.log('✓ Parent updated successfully');
 
     const updatedParent = await Property.findByPk(id, {
       include: [
@@ -385,9 +514,12 @@ const updateParent = async (req, res) => {
       ],
     });
 
+    console.log('========== UPDATE PARENT COMPLETE ==========');
     res.json(updatedParent);
   } catch (error) {
-    console.error('Error updating container:', error);
+    console.error('========== ERROR UPDATING PARENT ==========');
+    console.error('Error:', error);
+    console.error('Error message:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

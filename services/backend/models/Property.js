@@ -28,7 +28,7 @@ const Property = sequelize.define('Property', {
     allowNull: false,
   },
   property_category: {
-    type: DataTypes.ENUM('tower', 'market', 'sharak', 'normal'),
+    type: DataTypes.ENUM('tower', 'market', 'sharak', 'apartment', 'normal'),
     allowNull: false,
   },
   record_kind: {
@@ -37,7 +37,7 @@ const Property = sequelize.define('Property', {
     allowNull: false,
   },
   property_type: {
-    type: DataTypes.ENUM('house', 'shop', 'office', 'plot', 'land', 'apartment'),
+    type: DataTypes.ENUM('house', 'shop', 'office', 'plot', 'land', 'apartment', 'tower', 'market', 'sharak'),
     allowNull: false,
   },
   parent_id: {

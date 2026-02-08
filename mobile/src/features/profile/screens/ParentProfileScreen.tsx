@@ -187,10 +187,7 @@ const ParentProfileScreen = observer(() => {
             <View style={[styles.headerActions, { top: insets.top + 10 }]}>
               <TouchableOpacity 
                 style={styles.actionButton} 
-                onPress={() => router.push({
-                  pathname: `/parent/${category}/edit`,
-                  params: { id: parent.id }
-                })}
+                onPress={() => router.push(`/property/create?id=${parent.property_id || parent.id}`)}
               >
                 <Ionicons name="pencil" size={20} color="#fff" />
               </TouchableOpacity>
@@ -273,7 +270,11 @@ const ParentProfileScreen = observer(() => {
                     style={[styles.addUnitBtn, { backgroundColor: theme.primary }]}
                     onPress={() => router.push({
                       pathname: '/property/create',
-                      params: { parentId: parent.property_id || parent.id, category: parent.property_category }
+                      params: { 
+                        parentId: parent.property_id || parent.id, 
+                        category: parent.property_category,
+                        parentName: parent.title
+                      }
                     })}
                   >
                     <Ionicons name="add" size={18} color="#fff" />
@@ -310,16 +311,23 @@ const ParentProfileScreen = observer(() => {
               </ScrollView>
 
               {filteredUnits.length > 0 ? (
-                <View style={styles.unitsList}>
-                  {filteredUnits.map((unit, index) => (
-                    <PropertyCard 
-                      key={unit.property_id} 
-                      property={unit} 
-                      index={index}
-                      onPress={() => router.push(`/property/${unit.property_id}`)}
-                    />
-                  ))}
-                </View>
+                <FlatList
+                  data={filteredUnits}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingRight: 20 }}
+                  keyExtractor={(unit) => unit.property_id.toString()}
+                  renderItem={({ item: unit, index }) => (
+                    <View style={{ marginRight: 16, width: 280 }}>
+                      <PropertyCard 
+                        property={unit} 
+                        index={index}
+                        variant="compact"
+                        onPress={() => router.push(`/property/${unit.property_id}`)}
+                      />
+                    </View>
+                  )}
+                />
               ) : (
                 <View style={[styles.emptyUnits, { backgroundColor: theme.card }]}>
                   <Ionicons name="home-outline" size={40} color={theme.border} />

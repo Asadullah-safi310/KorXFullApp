@@ -125,7 +125,7 @@ const StepLocationAndAmenities = () => {
                 key={item.label}
                 style={[
                   styles.amenityChip,
-                  { backgroundColor: theme.card, borderColor: theme.border },
+                  { backgroundColor: 'transparent', borderColor: theme.border },
                   isActive && { borderColor: theme.primary, backgroundColor: theme.primary + '08' }
                 ]}
                 onPress={() => toggleAmenity(item.label)}
@@ -152,7 +152,7 @@ const StepLocationAndAmenities = () => {
           {/* Province Picker */}
           <View>
             <AppText variant="tiny" weight="bold" style={[{ color: theme.subtext }, styles.label]}>PROVINCE / CITY</AppText>
-            <View style={[styles.pickerWrapper, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.pickerWrapper, { backgroundColor: 'transparent', borderColor: theme.border }]}>
               {loadingProvinces ? <ActivityIndicator size="small" color={theme.primary} /> : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
                   {provinces.map((p) => {
@@ -181,7 +181,7 @@ const StepLocationAndAmenities = () => {
           {(values.province_id || values.provinceId) && (
             <View>
               <AppText variant="tiny" weight="bold" style={[{ color: theme.subtext }, styles.label]}>DISTRICT</AppText>
-              <View style={[styles.pickerWrapper, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={[styles.pickerWrapper, { backgroundColor: 'transparent', borderColor: theme.border }]}>
                 {loadingDistricts ? <ActivityIndicator size="small" color={theme.primary} /> : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
                     {districts.map((d) => {
@@ -210,7 +210,7 @@ const StepLocationAndAmenities = () => {
           {(values.district_id || values.districtId) && areas.length > 0 && (
             <View>
               <AppText variant="tiny" weight="bold" style={[{ color: theme.subtext }, styles.label]}>SPECIFIC AREA</AppText>
-              <View style={[styles.pickerWrapper, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={[styles.pickerWrapper, { backgroundColor: 'transparent', borderColor: theme.border }]}>
                 {loadingAreas ? <ActivityIndicator size="small" color={theme.primary} /> : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
                     {areas.map((a) => {
@@ -234,7 +234,7 @@ const StepLocationAndAmenities = () => {
           {/* Full Address Input */}
           <View>
             <AppText variant="tiny" weight="bold" style={[{ color: theme.subtext }, styles.label]}>STREET ADDRESS</AppText>
-            <View style={[styles.addressInput, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.addressInput, { backgroundColor: 'transparent', borderColor: theme.border }]}>
               <Ionicons name="location-outline" size={20} color={theme.subtext} style={{ marginTop: 2 }} />
               <TextInput
                 style={{ flex: 1, color: theme.text, marginLeft: 10, fontFamily: 'Inter-Medium', fontSize: 13 }}
@@ -268,7 +268,7 @@ const StepLocationAndAmenities = () => {
                 activeOpacity={0.7}
                 style={[
                   styles.amenityCard,
-                  { backgroundColor: theme.card, borderColor: theme.border },
+                  { backgroundColor: 'transparent', borderColor: theme.border },
                   isActive && { borderColor: theme.primary, backgroundColor: theme.primary + '08' }
                 ]}
                 onPress={() => toggleAmenity(item.label)}

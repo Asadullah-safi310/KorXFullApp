@@ -1,12 +1,16 @@
 import * as Yup from 'yup';
 import { propertyBaseSchema } from '../../../validation/schemas';
 
+// Property Category Types
+// Per requirements:
+// - Parent containers: tower, market, sharak
+// - Child units: inherit category from parent (tower, market, sharak)
+// - Standalone properties: normal
 export const PROPERTY_CATEGORY_TYPES = {
-  tower: ["apartment", "shop", "office"],
-  apartment: ["apartment", "shop", "office"], // Alias for tower
-  market: ["shop", "office"],
-  sharak: ["apartment", "shop", "office", "land", "plot", "house"],
-  normal: ["house", "apartment", "shop", "office", "land", "plot"]
+  tower: ["apartment", "shop", "office"], // Parent container category
+  market: ["shop", "office"], // Parent container category
+  sharak: ["apartment", "shop", "office", "land", "plot", "house"], // Parent container category
+  normal: ["house", "apartment", "shop", "office", "land", "plot"] // Standalone property category
 };
 
 export const PROPERTY_TYPES_CONFIG = [
@@ -21,16 +25,17 @@ export const initialValues = {
   // Step 1: Ownership & Type
   owner_person_id: '',
   agent_id: null,
-  property_category: 'normal',
-  record_kind: 'listing',
+  property_category: 'normal', // Default to standalone property
+  record_kind: 'listing', // Default to listing (standalone or child unit)
   property_type: '',
   purpose: 'sale',
-  is_parent: false,
-  parent_property_id: null,
+  is_parent: false, // Default to NOT a parent container
+  parent_property_id: null, // Default to no parent (standalone)
   parentId: null,
   apartment_id: null,
-  total_floors: '',
-  planned_units: '',
+  parentName: '',
+  total_floors: '', // Only for parent containers
+  planned_units: '', // Only for parent containers
 
   // Step 2: Basic Info
   title: '',
@@ -46,6 +51,7 @@ export const initialValues = {
   // Step 4: Media
   media: [], 
   existingMedia: [],
+  deletedMedia: [],
 
   // Step 5: Pricing
   for_sale: true,
@@ -67,8 +73,14 @@ export const initialValues = {
 };
 
 export const StepOwnershipSchema = Yup.object().shape({
-  property_category: Yup.string().oneOf(['tower', 'sharak', 'normal', 'market', 'apartment']).required('Category is required'),
+  // Per requirements: valid categories are tower, market, sharak, normal
+  // 'apartment' should be normalized to 'tower' before validation
+  property_category: Yup.string()
+    .oneOf(['tower', 'sharak', 'normal', 'market'], 'Invalid category')
+    .required('Category is required'),
   property_type: Yup.string().required('Type is required'),
+  record_kind: Yup.string().oneOf(['container', 'listing'], 'Invalid record kind'),
+  is_parent: Yup.boolean(),
 });
 
 export const StepBasicInfoSchema = Yup.object().shape({

@@ -85,14 +85,12 @@ const ProfileEditScreen = observer(() => {
       }
 
       await personService.updateProfile(data, true);
+      
+      // Refresh user data from server
       await authStore.checkAuth();
       
-      try {
-        const profileResponse = await personService.getProfile();
-        authStore.updateUserData(profileResponse.data);
-      } catch (refreshError) {
-        console.error('Failed to refresh profile data after update:', refreshError);
-      }
+      // Clear the local profile picture to force re-render with server data
+      setProfilePicture(null);
       
       Alert.alert('Success', 'Profile updated successfully', [
         { text: 'OK', onPress: () => router.back() }

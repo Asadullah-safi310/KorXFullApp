@@ -10,50 +10,116 @@ import { propertyService } from '../../../../services/property.service';
 
 const { width } = Dimensions.get('window');
 
-const StepOwnership = observer(({ isStandalone, isEditing, isAddingChild: isAddingChildProp }: any) => {
+const StepOwnership = observer(({ isStandalone, isEditing, isAddingChild: isAddingChildProp, isCreatingParent: isCreatingParentProp }: any) => {
   const { values, setFieldValue, errors, touched } = useFormikContext<any>();
   const theme = useThemeColor();
-  const [parentName, setParentName] = useState<string>('');
   const [loadingParent, setLoadingParent] = useState(false);
+
+  const isAddingChild = useMemo(() => {
+    return isAddingChildProp || 
+           !!values.parent_property_id || 
+           !!values.parentId || 
+           !!values.apartment_id;
+  }, [isAddingChildProp, values.parent_property_id, values.parentId, values.apartment_id]);
+
+  const isCreatingParent = useMemo(() => {
+    return isCreatingParentProp || !!values.is_parent;
+  }, [isCreatingParentProp, values.is_parent]);
 
   useEffect(() => {
     const parentId = values.parent_property_id || values.parentId || values.apartment_id;
-    if (parentId && !parentName) {
+    if (parentId && !values.parentName) {
       setLoadingParent(true);
       propertyService.getPropertyById(parentId)
-        .then(res => setParentName(res.title))
-        .catch(() => setParentName('Parent Property'))
+        .then(res => setFieldValue('parentName', res.title))
+        .catch(() => setFieldValue('parentName', 'Parent Property'))
         .finally(() => setLoadingParent(false));
     }
-  }, [values.parent_property_id, values.parentId, values.apartment_id]);
+  }, [values.parent_property_id, values.parentId, values.apartment_id, values.parentName]);
 
   useEffect(() => {
+    // Enforce category, record_kind, and is_parent based on context per requirements
     if (isStandalone && !isEditing && !isAddingChild) {
+      // Standalone properties: category='normal', record_kind='listing', is_parent=0, parent_property_id=NULL
       setFieldValue('property_category', 'normal');
-      setFieldValue('parent_id', null);
       setFieldValue('record_kind', 'listing');
       setFieldValue('is_parent', false);
+      setFieldValue('parent_property_id', null);
+      setFieldValue('parentId', null);
+      setFieldValue('apartment_id', null);
+    } else if (isAddingChild && !isEditing) {
+      // Child units: record_kind='listing', is_parent=0
+      // Category is inherited from parent and should NOT be changed by user
+      setFieldValue('record_kind', 'listing');
+      setFieldValue('is_parent', false);
+      
+      // Normalize category if it's 'apartment', but preserve tower, market, sharak
+      const currentCategory = (values.property_category || '').toLowerCase().trim();
+      if (currentCategory === 'apartment') {
+        setFieldValue('property_category', 'tower');
+      }
+      // Ensure the category is valid (should already be set from parent in create.tsx)
+      // If empty or invalid, preserve the current value - create.tsx handles the inheritance
+      // Don't override here as it would reset the correct inherited category
+    } else if (isCreatingParent && !isEditing) {
+      // Parent containers: record_kind='container', is_parent=1, category must be tower/market/sharak
+      setFieldValue('record_kind', 'container');
+      setFieldValue('is_parent', true);
+      setFieldValue('parent_property_id', null);
+      setFieldValue('parentId', null);
+      setFieldValue('apartment_id', null);
+      
+      // Normalize category if it's 'apartment'
+      const currentCategory = (values.property_category || '').toLowerCase().trim();
+      if (currentCategory === 'apartment') {
+        setFieldValue('property_category', 'tower');
+      }
+      // Ensure valid parent category
+      if (!['tower', 'market', 'sharak'].includes(currentCategory) || currentCategory === 'apartment') {
+        if (!['tower', 'market', 'sharak'].includes(currentCategory)) {
+          setFieldValue('property_category', 'tower');
+        }
+      }
     }
-  }, [isStandalone, isEditing]);
+  }, [isStandalone, isEditing, isAddingChild, isCreatingParent]);
 
-  const { normalizedCategory, propertyTypes, isAddingChild } = useMemo(() => {
-    const addingChild = isAddingChildProp || 
-                        !!values.parent_property_id || 
-                        !!values.parentId || 
-                        !!values.apartment_id ||
-                        (!values.is_parent && values.property_category && values.property_category !== 'normal');
-
+  const { normalizedCategory, propertyTypes } = useMemo(() => {
     let rawCat = (values.property_category || '').toLowerCase().trim();
     
-    if (addingChild && (rawCat === '' || rawCat === 'normal')) {
+    // Normalize 'apartment' to 'tower' (per requirements)
+    if (rawCat === 'apartment') {
       rawCat = 'tower';
-    } else if (rawCat === '') {
+    }
+    
+    // Valid parent categories that can have child units
+    const validParentCategories = ['tower', 'market', 'sharak'];
+    
+    if (isAddingChild) {
+      // For child units, category is inherited from parent container
+      // Only override if explicitly wrong (like 'normal'), but preserve empty (still loading from parent)
+      if (rawCat === 'normal') {
+        // 'normal' is not valid for child units, should be tower/market/sharak
+        rawCat = 'tower'; // Default fallback
+      } else if (rawCat !== '' && !validParentCategories.includes(rawCat)) {
+        // Invalid category (but not empty - empty means still loading)
+        rawCat = 'tower'; // Default fallback
+      }
+      // If rawCat is empty, preserve it - the initial values will set it correctly
+    } else if (isCreatingParent) {
+      // For parent containers, category must be tower, market, or sharak
+      if (!validParentCategories.includes(rawCat)) {
+        rawCat = 'tower'; // Default fallback
+      }
+    } else if (rawCat === '' || !['tower', 'market', 'sharak', 'normal'].includes(rawCat)) {
+      // For standalone properties, default to 'normal'
       rawCat = 'normal';
     }
     
-    const normCat = (rawCat === 'apartment' || rawCat === 'tower') ? 'tower' : 
+    // Final normalization (should already be normalized above, but just in case)
+    const normCat = (rawCat === 'tower') ? 'tower' : 
                     (rawCat === 'market') ? 'market' :
-                    (rawCat === 'sharak') ? 'sharak' : 'normal';
+                    (rawCat === 'sharak') ? 'sharak' :
+                    (rawCat === '' && isAddingChild) ? '' : 'normal'; // Preserve empty for child units still loading
 
     const categoryKey = normCat as keyof typeof PROPERTY_CATEGORY_TYPES;
     const allowedTypesList = PROPERTY_CATEGORY_TYPES[categoryKey] || [];
@@ -65,10 +131,9 @@ const StepOwnership = observer(({ isStandalone, isEditing, isAddingChild: isAddi
 
     return { 
       normalizedCategory: normCat, 
-      propertyTypes: filteredTypes,
-      isAddingChild: addingChild
+      propertyTypes: filteredTypes
     };
-  }, [values.property_category, values.is_parent, values.parent_property_id, values.parentId, values.apartment_id, isAddingChildProp]);
+  }, [values.property_category, values.is_parent, isAddingChild, isCreatingParent]);
 
   useEffect(() => {
     // Ensure property_type is set if it's empty but required
@@ -81,17 +146,31 @@ const StepOwnership = observer(({ isStandalone, isEditing, isAddingChild: isAddi
     }
   }, [values.property_type, values.is_parent, normalizedCategory, propertyTypes]);
 
-  // Handle category change (for when user can pick category - e.g. adding a new parent)
   const handleCategoryChange = (category: string) => {
-    setFieldValue('property_category', category);
-    if (category !== 'normal') {
+    // Normalize category: 'apartment' -> 'tower'
+    let normalizedCat = category.toLowerCase().trim();
+    if (normalizedCat === 'apartment') {
+      normalizedCat = 'tower';
+    }
+    
+    setFieldValue('property_category', normalizedCat);
+    
+    if (normalizedCat !== 'normal') {
+      // Parent container selected: record_kind='container', is_parent=1
       setFieldValue('is_parent', true);
       setFieldValue('record_kind', 'container');
-      setFieldValue('property_type', category); 
+      setFieldValue('property_type', normalizedCat);
+      setFieldValue('parent_property_id', null);
+      setFieldValue('parentId', null);
+      setFieldValue('apartment_id', null);
     } else {
+      // Standalone property selected: record_kind='listing', is_parent=0
       setFieldValue('is_parent', false);
       setFieldValue('record_kind', 'listing');
-      const newAllowedTypes = PROPERTY_CATEGORY_TYPES[category as keyof typeof PROPERTY_CATEGORY_TYPES] || [];
+      setFieldValue('parent_property_id', null);
+      setFieldValue('parentId', null);
+      setFieldValue('apartment_id', null);
+      const newAllowedTypes = PROPERTY_CATEGORY_TYPES[normalizedCat as keyof typeof PROPERTY_CATEGORY_TYPES] || [];
       if (!newAllowedTypes.includes(values.property_type)) {
         setFieldValue('property_type', newAllowedTypes[0] || '');
       }
@@ -105,18 +184,32 @@ const StepOwnership = observer(({ isStandalone, isEditing, isAddingChild: isAddi
     return null;
   };
 
-  const showCategorySelection = !isStandalone && !isEditing && !isAddingChild;
+  // Hide category selection when:
+  // 1. Adding a child unit (inherits from parent)
+  // 2. Creating a parent from My Towers/Markets/Sharaks (category locked from route)
+  // Per requirements: User must NOT manually change category in these flows
+  const showCategorySelection = !isEditing && !isAddingChild && !isCreatingParent;
 
   // Title Logic
-  const mainTitle = isAddingChild 
-    ? `Add ${values.property_type ? values.property_type.charAt(0).toUpperCase() + values.property_type.slice(1) : 'Unit'}`
-    : values.is_parent 
-      ? `Add New ${normalizedCategory.charAt(0).toUpperCase() + normalizedCategory.slice(1)}`
-      : 'Add Standalone Property';
+  const mainTitle = isEditing
+    ? values.is_parent 
+      ? `Update ${normalizedCategory.charAt(0).toUpperCase() + normalizedCategory.slice(1)}`
+      : 'Update Property'
+    : isAddingChild 
+      ? `Add Property to ${values.parentName || 'Parent'}`
+      : isCreatingParent
+        ? `Create New ${normalizedCategory.charAt(0).toUpperCase() + normalizedCategory.slice(1)}`
+        : values.is_parent 
+          ? `Add New ${normalizedCategory.charAt(0).toUpperCase() + normalizedCategory.slice(1)}`
+          : 'Add Standalone Property';
 
-  const subTitle = isAddingChild && parentName 
-    ? `Inside ${parentName}` 
-    : 'Let\'s start with the basics';
+  const subTitle = isEditing
+    ? 'Update property information'
+    : isAddingChild && values.parentName 
+      ? `Adding a new unit inside ${values.parentName}` 
+      : isCreatingParent
+        ? `Creating a ${normalizedCategory} container to hold multiple units`
+        : 'Let\'s start with the basics';
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
@@ -130,14 +223,22 @@ const StepOwnership = observer(({ isStandalone, isEditing, isAddingChild: isAddi
         <View style={[styles.chip, { backgroundColor: theme.primary + '15' }]}>
           <MaterialCommunityIcons name="tag-outline" size={14} color={theme.primary} />
           <AppText variant="tiny" weight="bold" style={{ color: theme.primary, marginLeft: 6, textTransform: 'capitalize' }}>
-            Category: {normalizedCategory}
+            {isCreatingParent ? 'Container Type: ' : 'Category: '}{normalizedCategory}
           </AppText>
         </View>
         {isAddingChild && (
           <View style={[styles.chip, { backgroundColor: theme.secondary + '15' }]}>
             <MaterialCommunityIcons name="office-building-outline" size={14} color={theme.secondary} />
             <AppText variant="tiny" weight="bold" style={{ color: theme.secondary, marginLeft: 6 }}>
-              Inside: {parentName || '...'}
+              Inside: {values.parentName || '...'}
+            </AppText>
+          </View>
+        )}
+        {isCreatingParent && (
+          <View style={[styles.chip, { backgroundColor: theme.success + '15' }]}>
+            <MaterialCommunityIcons name="lock-outline" size={14} color={theme.success} />
+            <AppText variant="tiny" weight="bold" style={{ color: theme.success, marginLeft: 6 }}>
+              Locked
             </AppText>
           </View>
         )}
@@ -163,7 +264,7 @@ const StepOwnership = observer(({ isStandalone, isEditing, isAddingChild: isAddi
                   activeOpacity={0.8}
                   style={[
                     styles.categoryCard,
-                    { backgroundColor: theme.card, borderColor: theme.border },
+                    { backgroundColor: 'transparent', borderColor: theme.border },
                     isActive && { borderColor: theme.primary, backgroundColor: theme.primary + '08' }
                   ]}
                   onPress={() => handleCategoryChange(cat)}
@@ -198,7 +299,7 @@ const StepOwnership = observer(({ isStandalone, isEditing, isAddingChild: isAddi
                   activeOpacity={0.7}
                   style={[
                     styles.typeCard,
-                    { backgroundColor: theme.card, borderColor: theme.border },
+                    { backgroundColor: 'transparent', borderColor: theme.border },
                     isActive && { borderColor: theme.primary, backgroundColor: theme.primary + '08' },
                   ]}
                   onPress={() => setFieldValue('property_type', type.value)}

@@ -53,10 +53,12 @@ const AvatarComponent: React.FC<AvatarProps> = ({ user, size = 'md' }) => {
     }]}>
       {finalImageSource && !imageError ? (
         <Image
+          key={finalImageSource}
           source={{ uri: finalImageSource }}
           style={{ width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }}
           contentFit="cover"
           transition={200}
+          cachePolicy="memory-disk"
           onError={() => setImageError(true)}
         />
       ) : (

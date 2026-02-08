@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Platform } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Platform, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import personStore from '../../../stores/PersonStore';
 import Avatar from '../../../components/Avatar';
 import { getImageUrl } from '../../../utils/mediaUtils';
 import PropertyCard from '../../../components/PropertyCard';
+import { ParentReelCard } from '../../dashboard/components/ParentReelCard';
 import { propertyService } from '../../../services/property.service';
 import { userService } from '../../../services/user.service';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -43,7 +44,7 @@ const PersonDetailsScreen = observer(() => {
           const data = await personStore.fetchPersonById(personId);
           setPerson(data);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to fetch person details', err);
         setPerson(null);
       } finally {
@@ -62,19 +63,14 @@ const PersonDetailsScreen = observer(() => {
         if (isUser) {
           const agentUserId = person.user_id?.toString();
           if (agentUserId) {
-            const [assignedRes, createdRes] = await Promise.all([
-              propertyService.searchProperties({ agent_id: agentUserId, status: 'available' }),
-              propertyService.searchProperties({ created_by_user_id: agentUserId, status: 'available' }),
-            ]);
-            const combined = [ ...(assignedRes.data || []), ...(createdRes.data || []) ];
-            const unique = Object.values(combined.reduce((acc: any, p: any) => { acc[p.property_id] = p; return acc; }, {}));
-            setProperties(unique as any[]);
+            const res = await propertyService.getPublicPropertiesByUser(agentUserId, 100);
+            setProperties(res.data || []);
           } else {
             setProperties([]);
           }
         } else {
           const userId = person.user_id || person.id;
-          const res = await propertyService.searchProperties({ created_by_user_id: userId, status: 'available' });
+          const res = await propertyService.getPublicPropertiesByUser(userId, 100);
           setProperties(res.data || []);
         }
       } catch (err) {
@@ -87,6 +83,32 @@ const PersonDetailsScreen = observer(() => {
 
     fetchProperties();
   }, [person, isUser]);
+
+  // Separate properties into individual units and parent containers
+  const { individualProperties, parentProperties } = useMemo(() => {
+    const individual: any[] = [];
+    const parent: any[] = [];
+
+    properties.forEach((prop: any) => {
+      const isContainer = ['tower', 'apartment', 'sharak', 'market'].includes(prop.property_category?.toLowerCase());
+      
+      if (isContainer && !prop.parent_property_id) {
+        // Map to format expected by ParentReelCard
+        parent.push({
+          id: prop.property_id,
+          property_id: prop.property_id,
+          title: prop.title || prop.property_type || 'Untitled',
+          category: prop.property_category?.toLowerCase(),
+          images: prop.photos || prop.images || [],
+          availableUnits: prop.available_children || prop.total_children || 0,
+        });
+      } else if (prop.record_kind === 'listing') {
+        individual.push(prop);
+      }
+    });
+
+    return { individualProperties: individual, parentProperties: parent };
+  }, [properties]);
 
   const handleCall = (phone: string) => {
     if (phone) Linking.openURL(`tel:${phone}`);
@@ -226,35 +248,70 @@ const PersonDetailsScreen = observer(() => {
           </>
         )}
 
-        {/* Property Listings */}
-        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-          <AppText style={[styles.sectionTitle, { color: theme.text }]}>
-            {isUser ? 'Active Listings' : 'Associated Properties'}
-          </AppText>
-          <AppText style={[styles.countBadge, { color: theme.primary, backgroundColor: theme.primary + '15' }]}>
-            {properties.length}
-          </AppText>
-        </View>
-
+        {/* Parent Properties (Towers, Sharaks, Markets) */}
         {loadingProperties ? (
           <View style={styles.loadingList}>
             <ActivityIndicator size="small" color={theme.primary} />
           </View>
-        ) : properties.length > 0 ? (
-          <View style={styles.propertiesList}>
-            {properties.map((prop: any) => (
-              <PropertyCard 
-                key={prop.property_id} 
-                property={prop} 
-                onPress={() => router.push(`/property/${prop.property_id}`)}
-              />
-            ))}
-          </View>
         ) : (
-          <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <MaterialCommunityIcons name="home-off" size={40} color={theme.border} />
-            <AppText style={[styles.emptyText, { color: theme.subtext }]}>No properties listed publicly</AppText>
-          </View>
+          <>
+            {parentProperties.length > 0 && (
+              <>
+                <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+                  <AppText style={[styles.sectionTitle, { color: theme.text }]}>
+                    Buildings & Projects
+                  </AppText>
+                  <AppText style={[styles.countBadge, { color: theme.primary, backgroundColor: theme.primary + '15' }]}>
+                    {parentProperties.length}
+                  </AppText>
+                </View>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.parentPropertiesList}
+                  style={styles.parentPropertiesScroll}
+                >
+                  {parentProperties.map((prop: any) => (
+                    <ParentReelCard 
+                      key={prop.property_id} 
+                      item={prop} 
+                      onPress={() => router.push(`/property/${prop.property_id}`)}
+                    />
+                  ))}
+                </ScrollView>
+              </>
+            )}
+
+            {/* Individual Property Listings */}
+            {individualProperties.length > 0 && (
+              <>
+                <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+                  <AppText style={[styles.sectionTitle, { color: theme.text }]}>
+                    {isUser ? 'Listed Properties' : 'Associated Properties'}
+                  </AppText>
+                  <AppText style={[styles.countBadge, { color: theme.primary, backgroundColor: theme.primary + '15' }]}>
+                    {individualProperties.length}
+                  </AppText>
+                </View>
+                <View style={styles.propertiesList}>
+                  {individualProperties.map((prop: any) => (
+                    <PropertyCard 
+                      key={prop.property_id} 
+                      property={prop} 
+                      onPress={() => router.push(`/property/${prop.property_id}`)}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
+
+            {properties.length === 0 && (
+              <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 24 }]}>
+                <MaterialCommunityIcons name="home-off" size={40} color={theme.border} />
+                <AppText style={[styles.emptyText, { color: theme.subtext }]}>No properties listed</AppText>
+              </View>
+            )}
+          </>
         )}
       </View>
     </ScreenLayout>
@@ -456,6 +513,13 @@ const styles = StyleSheet.create({
   },
   propertiesList: {
     gap: 16,
+  },
+  parentPropertiesScroll: {
+    marginBottom: 16,
+  },
+  parentPropertiesList: {
+    gap: 12,
+    paddingRight: 20,
   },
   loadingList: {
     padding: 40,

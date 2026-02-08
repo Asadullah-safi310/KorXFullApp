@@ -325,6 +325,12 @@ const PropertyDetailsScreen = observer(() => {
     authStore.user?.user_id === property.agent_id
   );
 
+  const canAddUnit = property && property.record_kind === 'container' && (
+    authStore.isAdmin || 
+    authStore.user?.user_id === property.created_by_user_id ||
+    authStore.user?.user_id === property.agent_id
+  );
+
   const handleDelete = () => {
     Alert.alert(
       'Delete Property',
@@ -358,6 +364,7 @@ const PropertyDetailsScreen = observer(() => {
 
   const handleProfilePress = (user: any) => {
     if (!user) return;
+    
     if (user.user_id) {
       router.push(`/person/user_${user.user_id}`);
     } else if (user.id) {
@@ -394,6 +401,8 @@ const PropertyDetailsScreen = observer(() => {
   const price = parseFloat(property.purpose === 'sale' ? property.sale_price : property.rent_price);
   const currency = property.purpose === 'sale' ? property.sale_currency : property.rent_currency;
   const currencySymbol = currency === 'USD' ? '$' : 'AF';
+
+  const listingUser = property.Creator || property.Agent;
 
   const handleAddUnit = () => {
     router.push({
@@ -492,19 +501,19 @@ const PropertyDetailsScreen = observer(() => {
           
           <View style={styles.headerInfo}>
             <View style={styles.priceRow}>
-              {isContainer ? (
+              {!isContainer && price > 0 ? (
+                <AppText variant="h2" weight="bold" color={primaryColor}>
+                  {currency === 'USD' ? `${currencySymbol}${price.toLocaleString()}` : `${price.toLocaleString()} ${currencySymbol}`}
+                  {property.purpose === 'rent' && <AppText variant="body" weight="medium" color={theme.subtext}> / month</AppText>}
+                </AppText>
+              ) : isContainer ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="business" size={24} color={primaryColor} />
                   <AppText variant="h2" weight="bold" color={theme.text} style={{ marginLeft: 8 }}>
                     {property.property_category ? property.property_category.charAt(0).toUpperCase() + property.property_category.slice(1) : 'Building'}
                   </AppText>
                 </View>
-              ) : (
-                <AppText variant="h2" weight="bold" color={primaryColor}>
-                  {currency === 'USD' ? `${currencySymbol}${price.toLocaleString()}` : `${price.toLocaleString()} ${currencySymbol}`}
-                  {property.purpose === 'rent' && <AppText variant="body" weight="medium" color={theme.subtext}> / month</AppText>}
-                </AppText>
-              )}
+              ) : null}
               <View style={[styles.statusBadge, { backgroundColor: property.status === 'active' ? '#dcfce7' : '#fee2e2' }]}>
                 <AppText variant="tiny" weight="bold" color={property.status === 'active' ? '#166534' : '#991b1b'}>
                   {property.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
@@ -533,7 +542,7 @@ const PropertyDetailsScreen = observer(() => {
 
             <View style={styles.titleFavoriteRow}>
               <View style={{ flex: 1 }}>
-                <AppText variant="h1" weight="bold" color={theme.text} style={styles.propertyTitle}>
+                <AppText variant="title" weight="bold" color={theme.text} style={styles.propertyTitle}>
                   {property.parent_property_id && property.unit_number
                     ? `${property.property_type} ${property.unit_number}${property.floor ? ` (Floor ${property.floor})` : ''}`
                     : (property.title || `${property.bedrooms || ''} Bed ${property.property_type}`)}
@@ -549,8 +558,8 @@ const PropertyDetailsScreen = observer(() => {
 
             <View style={styles.locationRatingRow}>
               <View style={styles.locationRow}>
-                <Ionicons name="location" size={16} color="#f87171" />
-                <AppText variant="body" weight="medium" color={theme.subtext} style={{ marginLeft: 4 }}>
+                <Ionicons name="location" size={14} color="#f87171" />
+                <AppText variant="small" weight="medium" color={theme.subtext} style={{ marginLeft: 4 }}>
                   {[property.address, property.AreaData?.name].filter(Boolean).join(', ')}
                 </AppText>
               </View>
@@ -581,30 +590,25 @@ const PropertyDetailsScreen = observer(() => {
             <View style={styles.agentInfoRow}>
               <TouchableOpacity 
                 activeOpacity={0.7} 
-                onPress={() => handleProfilePress(property.Agent || property.Creator)}
+                onPress={() => handleProfilePress(listingUser)}
                 style={styles.agentMainInfo}
               >
-                <Avatar user={property.Agent || property.Creator} size="md" />
-                <View style={styles.agentTextContainer}>
-                  <AppText variant="body" weight="bold" color={theme.text}>
-                    {(property.Agent || property.Creator)?.full_name || 'Agent Name'}
-                  </AppText>
-                  <AppText variant="small" color={theme.subtext} style={{ marginTop: 2 }}>
-                    Listing agent in charge of property.
-                  </AppText>
-                </View>
+                <Avatar user={listingUser} size="md" />
+                <AppText variant="body" weight="bold" color={theme.text} style={{ marginLeft: 12 }}>
+                  {listingUser?.full_name || 'Agent Name'}
+                </AppText>
               </TouchableOpacity>
               <View style={styles.agentActionButtons}>
                 <TouchableOpacity 
                   style={[styles.messageIcon, { backgroundColor: '#25D366', marginRight: 8 }]}
-                  onPress={() => handleWhatsApp(property.Agent || property.Creator)}
+                  onPress={() => handleWhatsApp(listingUser)}
                 >
                   <Ionicons name="logo-whatsapp" size={18} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.messageIcon, { backgroundColor: '#1e293b' }]}
                   onPress={() => {
-                    const email = (property.Agent || property.Creator)?.email;
+                    const email = listingUser?.email;
                     if (email) {
                       Linking.openURL(`mailto:${email}?subject=Inquiry: ${property.title}`);
                     }
@@ -679,7 +683,7 @@ const PropertyDetailsScreen = observer(() => {
                 <AppText variant="title" weight="bold" color={theme.text} style={styles.sectionTitle}>
                   Units Available in This {property.property_category ? property.property_category.charAt(0).toUpperCase() + property.property_category.slice(1) : 'Container'}
                 </AppText>
-                {canEdit && (
+                {canAddUnit && (
                   <TouchableOpacity 
                     style={[styles.addUnitBtn, { borderColor: primaryColor }]}
                     onPress={() => router.push(`/property/create?parentId=${property.property_id}&category=${property.property_category}`)}
@@ -693,16 +697,23 @@ const PropertyDetailsScreen = observer(() => {
               {loadingChildren ? (
                 <ActivityIndicator size="small" color={primaryColor} style={{ marginVertical: 20 }} />
               ) : children.length > 0 ? (
-                <View style={styles.childrenList}>
-                  {children.map((child, index) => (
-                    <PropertyCard 
-                      key={child.property_id}
-                      property={child}
-                      index={index}
-                      onPress={() => router.push(`/property/${child.property_id}`)}
-                    />
-                  ))}
-                </View>
+                <FlatList
+                  data={children}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingRight: 20 }}
+                  keyExtractor={(child) => child.property_id.toString()}
+                  renderItem={({ item: child, index }) => (
+                    <View style={{ marginRight: 16, width: 280 }}>
+                      <PropertyCard 
+                        property={child}
+                        index={index}
+                        variant="compact"
+                        onPress={() => router.push(`/property/${child.property_id}`)}
+                      />
+                    </View>
+                  )}
+                />
               ) : (
                 <View style={[styles.emptyChildren, { backgroundColor: theme.card }]}>
                   <AppText variant="small" color={theme.subtext}>No homes available yet</AppText>
@@ -830,15 +841,15 @@ const PropertyDetailsScreen = observer(() => {
             </TouchableOpacity>
           </View>
 
-          {/* Agent Section */}
-          {/* <View style={styles.section}>
+          {/* Listed By Section */}
+          <View style={styles.section}>
             <AppText variant="title" weight="bold" color={theme.text} style={styles.sectionTitle}>Listed By</AppText>
             <ProfileSection 
               title="" 
-              user={property.Agent || property.Creator} 
-              type={property.Agent ? "Agent" : "Owner"} 
+              user={listingUser} 
+              type={listingUser?.role === 'agent' ? "Agent" : "User"} 
             />
-          </View> */}
+          </View>
         </View>
       </Animated.ScrollView>
 
@@ -914,10 +925,10 @@ const PropertyDetailsScreen = observer(() => {
         style={[styles.footer, { borderTopColor: theme.border, paddingBottom: insets.bottom + 12 }]}
       >
         <View style={styles.footerInner}>
-          {(property.Agent?.phone || property.Creator?.phone) && (
+          {listingUser?.phone && (
             <TouchableOpacity 
               style={[styles.callBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
-              onPress={() => handleCall(property.Agent?.phone || property.Creator?.phone)}
+              onPress={() => handleCall(listingUser.phone)}
             >
               <Ionicons name="call" size={22} color={primaryColor} />
             </TouchableOpacity>
@@ -1082,7 +1093,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 16,
     borderRadius: 16,
-    borderWidth: 1,
     marginBottom: 20,
     justifyContent: 'space-between',
   },
@@ -1123,14 +1133,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   propertyTitle: {
-    fontSize: 24,
-    lineHeight: 32,
-    letterSpacing: -0.5,
+    fontSize: 18,
+    lineHeight: 24,
+    letterSpacing: -0.3,
   },
   floatingCard: {
     borderRadius: 24,
     padding: 20,
-    borderWidth: 1,
     marginBottom: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
@@ -1141,6 +1150,12 @@ const styles = StyleSheet.create({
   agentInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  agentMainInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   agentActionButtons: {
     flexDirection: 'row',
@@ -1208,7 +1223,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 1,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
@@ -1251,7 +1265,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderRadius: 16,
-    borderWidth: 1,
     justifyContent: 'space-between',
   },
   miniProfileMain: {
@@ -1295,7 +1308,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 16,
-    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1352,7 +1364,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderRadius: 16,
-    borderWidth: 1,
   },
   addUnitBtn: {
     flexDirection: 'row',
@@ -1360,7 +1371,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    borderWidth: 1,
     gap: 4,
   },
   childrenList: {
@@ -1371,7 +1381,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 10,
     borderRadius: 12,
-    borderWidth: 1,
   },
   childImageWrapper: {
     width: 60,

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppText } from '../../../components/AppText';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { getImageUrl } from '../../../utils/mediaUtils';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.7;
@@ -43,7 +44,7 @@ export const ContainerReelCard = ({ item, onPress, badgeColor }: ContainerReelCa
           data={item.images}
           renderItem={({ item: imageUri }) => (
             <Image 
-              source={{ uri: imageUri }} 
+              source={{ uri: getImageUrl(imageUri) || '' }} 
               style={styles.image}
               contentFit="cover"
             />

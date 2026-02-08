@@ -35,7 +35,7 @@ const CustomSlider = ({ label, value, onChange, min = 0, max = 10 }: any) => {
             activeOpacity={0.7}
             style={[
               styles.sliderThumb,
-              { borderColor: theme.border, backgroundColor: theme.card },
+              { borderColor: theme.border, backgroundColor: 'transparent' },
               value === num && { backgroundColor: theme.primary, borderColor: theme.primary }
             ]}
             onPress={() => onChange(num)}

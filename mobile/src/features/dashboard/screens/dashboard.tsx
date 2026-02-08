@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, RefreshControl, TouchableOpacity, Dimensions, ActivityIndicator, FlatList, ScrollView } from 'react-native';
 import { observer } from 'mobx-react-lite';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import authStore from '../../../stores/AuthStore';
 import propertyStore from '../../../stores/PropertyStore';
 import favoriteStore from '../../../stores/FavoriteStore';
@@ -14,7 +14,7 @@ import { AppText } from '../../../components/AppText';
 import { Image } from 'expo-image';
 
 import { homeService } from '../../../services/home.service';
-import { ContainerReelsSection } from '../components/ContainerReelsSection';
+import { ParentReelSection } from '../components/ParentReelSection';
 
 const { width } = Dimensions.get('window');
 
@@ -22,12 +22,6 @@ const BANNER_IMAGES = [
   'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=2070&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=2070&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070&auto=format&fit=crop',
-];
-
-const RECENT_SEARCHES = [
-  'Buy in India',
-  'Independent House/Villa',
-  'All Recent Searches'
 ];
 
 const StatCard = ({ icon, label, value, color }: any) => {
@@ -224,7 +218,7 @@ const AdminDashboard = observer(() => {
 const UserDashboard = observer(() => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const [containers, setContainers] = useState<any>({ apartments: [], markets: [], sharaks: [] });
+  const [containers, setContainers] = useState<any>({ towers: [], apartments: [], markets: [], sharaks: [] });
   const bannerRef = useRef<FlatList>(null);
   const router = useRouter();
   const themeColors = useThemeColor();
@@ -233,15 +227,24 @@ const UserDashboard = observer(() => {
     try {
       await propertyStore.fetchPublicProperties(10);
       const containerData = await homeService.getContainers();
-      setContainers(containerData);
+      if (containerData) {
+        setContainers({
+          towers: containerData.towers || [],
+          apartments: containerData.apartments || [],
+          markets: containerData.markets || [],
+          sharaks: containerData.sharaks || [],
+        });
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchData();
+    }, [])
+  );
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -271,97 +274,6 @@ const UserDashboard = observer(() => {
       </View>
     </View>
   );
-
-  const FeaturedProjectCard = observer(({ property, index, onPress }: any) => {
-    const theme = useThemeColor();
-    const router = useRouter();
-    const isFavorite = favoriteStore.isFavorite(property.property_id);
-
-    const price = property.sale_price 
-      ? `₹${property.sale_price >= 10000000 ? (property.sale_price / 10000000).toFixed(2) + ' Cr' : (property.sale_price / 100000).toFixed(2) + ' L'}`
-      : property.rent_price 
-        ? `₹${property.rent_price.toLocaleString()}/mo`
-        : 'Price on Request';
-
-    const isSale = property.is_available_for_sale || property.purpose === 'SALE' || property.purpose === 'BOTH';
-    const isRent = property.is_available_for_rent || property.purpose === 'RENT' || property.purpose === 'BOTH';
-
-    const toggleFavorite = (e: any) => {
-      e.stopPropagation();
-      if (!authStore.isAuthenticated) {
-        router.push('/login');
-        return;
-      }
-      favoriteStore.toggleFavorite(property.property_id);
-    };
-
-    return (
-      <TouchableOpacity 
-        style={styles.featuredCard} 
-        activeOpacity={0.9}
-        onPress={onPress}
-      >
-        <View style={styles.cardImageContainer}>
-          <Image 
-            source={{ uri: property.photos?.[0] || 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6' }} 
-            style={styles.featuredImage}
-            contentFit="cover"
-          />
-          <View style={styles.cardTopTags}>
-            {(isSale || isRent) && (
-              <View style={styles.availabilityDot} />
-            )}
-            {isSale && (
-              <View style={[styles.statusTag, { backgroundColor: themeColors.primary + '15' }]}>
-                <AppText variant="caption" weight="bold" color={themeColors.primary} style={{ fontSize: 10 }}>For Sale</AppText>
-              </View>
-            )}
-            {isRent && (
-              <View style={[styles.statusTag, { backgroundColor: themeColors.success + '15' }]}>
-                <AppText variant="caption" weight="bold" color={themeColors.success} style={{ fontSize: 10 }}>For Rent</AppText>
-              </View>
-            )}
-          </View>
-          <TouchableOpacity 
-            style={styles.heartBtnSmall} 
-            onPress={toggleFavorite}
-            activeOpacity={0.7}
-          >
-            <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={20} color={isFavorite ? themeColors.danger : themeColors.white} />
-          </TouchableOpacity>
-
-          <View style={styles.imageBottomOverlay}>
-            <View style={styles.possessionTag}>
-              <Ionicons name="home-outline" size={12} color={themeColors.white} />
-              <AppText variant="caption" color={themeColors.white} style={{ fontSize: 10, textTransform: 'capitalize' }}>{property.property_type || 'Property'}</AppText>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.featuredInfo}>
-          <View style={styles.priceRowModern}>
-            <AppText variant="h3" weight="bold" color={theme.text}>{price}</AppText>
-            <View style={[styles.configBadge, { backgroundColor: theme.primary + '10' }]}>
-              <AppText variant="caption" weight="bold" color={theme.primary} style={{ fontSize: 11 }}>{property.bedrooms} BHK</AppText>
-            </View>
-          </View>
-          
-          {property.title ? (
-            <AppText variant="body" weight="bold" color={theme.text} numberOfLines={1} style={styles.featuredTitleModern}>
-              {property.title}
-            </AppText>
-          ) : null}
-          
-          <View style={styles.locationRowModern}>
-            <Ionicons name="location-sharp" size={14} color={theme.subtext} />
-            <AppText variant="small" weight="medium" color={theme.subtext} numberOfLines={1} style={{ fontSize: 13 }}>
-              {property.location || property.area_id || 'India'}
-            </AppText>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  });
 
   return (
     <ScreenLayout
@@ -399,7 +311,7 @@ const UserDashboard = observer(() => {
                 { backgroundColor: index === activeBannerIndex ? '#fff' : 'rgba(255,255,255,0.4)' },
                 index === activeBannerIndex && { width: 20 }
               ]} 
-            />
+              />
           ))}
         </View>
 
@@ -413,7 +325,7 @@ const UserDashboard = observer(() => {
               onPress={() => router.push('/search')}
             >
               <AppText variant="body" weight="medium" color={themeColors.text} style={{ fontSize: 17 }}>
-                Search &quot;Noida&quot;
+                Search &quot;&quot;
               </AppText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.micBtn}>
@@ -423,60 +335,25 @@ const UserDashboard = observer(() => {
         </View>
       </View>
 
-      {/* Modern Recent Searches */}
-      <View style={styles.modernRecentSection}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modernRecentScroll}>
-          <View style={styles.recentLabelContainer}>
-            <MaterialCommunityIcons name="history" size={18} color={themeColors.subtext} />
-            <AppText variant="caption" weight="bold" color={themeColors.subtext} style={{ lineHeight: 14 }}>Recent{"\n"}Search</AppText>
-          </View>
-          {RECENT_SEARCHES.map((search, index) => (
-            <TouchableOpacity 
-              key={index} 
-              style={[styles.modernChip, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
-            >
-              <AppText variant="small" weight="semiBold" color={themeColors.text}>{search}</AppText>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+      <View style={{ marginTop: 40 }}>
+        <ParentReelSection 
+          title="Tower" 
+          data={[...(containers.towers || []), ...(containers.apartments || [])]} 
+          category="tower"
+        />
+
+        <ParentReelSection 
+          title="Markets" 
+          data={containers.markets || []} 
+          category="market"
+        />
+
+        <ParentReelSection 
+          title="Sharaks" 
+          data={containers.sharaks || []} 
+          category="sharak"
+        />
       </View>
-      
-      {/* Project In High Demand Section */}
-      <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
-        <AppText variant="title" weight="bold" color={themeColors.text} style={{ marginBottom: 16 }}>
-          Project in High Demand
-        </AppText>
-        {propertyStore.publicProperties.map((property, index) => (
-          <FeaturedProjectCard 
-            key={property.property_id} 
-            property={property} 
-            index={index}
-            onPress={() => router.push(`/property/${property.property_id}`)}
-          />
-        ))}
-      </View>
-
-      {/* Container Reels Sections */}
-      <ContainerReelsSection 
-        title="Featured Apartments" 
-        data={containers.apartments} 
-        category="apartment"
-        badgeColor="#3b82f6" 
-      />
-
-      <ContainerReelsSection 
-        title="Explore Markets" 
-        data={containers.markets} 
-        category="market"
-        badgeColor="#10b981" 
-      />
-
-      <ContainerReelsSection 
-        title="Top Sharaks" 
-        data={containers.sharaks} 
-        category="sharak"
-        badgeColor="#f59e0b" 
-      />
     </ScreenLayout>
   );
 });
@@ -682,123 +559,5 @@ const styles = StyleSheet.create({
   },
   micBtn: {
     padding: 4,
-  },
-  modernRecentSection: {
-    marginTop: 64,
-    paddingLeft: 20,
-  },
-  recentLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-    gap: 8,
-  },
-  recentSearchLabel: {
-  },
-  modernChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginRight: 10,
-    borderWidth: 1,
-    justifyContent: 'center',
-  },
-  modernChipText: {
-  },
-  premiumLoader: {
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  featuredCard: {
-    borderRadius: 24,
-    marginBottom: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-  },
-  cardImageContainer: {
-    height: 220,
-    width: '100%',
-    position: 'relative',
-  },
-  featuredImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cardTopTags: {
-    position: 'absolute',
-    top: 15,
-    left: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  availabilityDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#10b981',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  statusTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  heartBtnSmall: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  imageBottomOverlay: {
-    position: 'absolute',
-    bottom: 15,
-    left: 15,
-  },
-  possessionTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 6,
-  },
-  featuredInfo: {
-    padding: 20,
-  },
-  priceRowModern: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  configBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  featuredTitleModern: {
-    marginBottom: 10,
-    fontSize: 18,
-    lineHeight: 24,
-  },
-  locationRowModern: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
 });

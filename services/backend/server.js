@@ -42,6 +42,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/public/properties', publicPropertyRoutes);
+app.use('/api/public/users', publicUserRoutes);
 app.use('/api/properties', protect, protectedPropertyRoutes);
 app.use('/api/deals', protect, protectedDealRoutes);
 app.use('/api/profile', protect, protectedProfileRoutes);

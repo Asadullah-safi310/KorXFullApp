@@ -23,7 +23,7 @@ const StepReview = ({ onEditStep }: StepReviewProps) => {
   const agent = personStore.agents.find(a => String(a.user_id) === values.agent_id);
 
   const ReviewSection = ({ title, stepIndex, children }: { title: string; stepIndex: number; children: React.ReactNode }) => (
-    <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
+    <View style={[styles.section, { borderColor: theme.border, backgroundColor: 'transparent' }]}>
       <View style={[styles.sectionHeader, { borderBottomColor: theme.border }]}>
         <AppText variant="small" weight="bold" style={[{ color: theme.text }, styles.sectionTitle]}>{title}</AppText>
         <TouchableOpacity onPress={() => onEditStep(stepIndex)} style={[styles.editBtn, { backgroundColor: theme.infoSubtle }]}>

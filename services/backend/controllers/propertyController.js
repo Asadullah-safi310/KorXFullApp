@@ -14,6 +14,15 @@ const hasPermission = (user, permission) => {
   return false;
 };
 
+// Helper to sanitize integer fields (convert empty strings to null)
+const sanitizeInt = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (value === '' || value === 'null' || value === 'undefined') return null;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? null : parsed;
+};
+
 const createProperty = async (req, res) => {
   const transaction = await sequelize.transaction();
 
@@ -46,9 +55,30 @@ const createProperty = async (req, res) => {
       photos
     } = req.body;
 
+    // Sanitize integer fields
+    const sanitizedOwnerId = sanitizeInt(owner_person_id);
+    const sanitizedAgentId = sanitizeInt(agent_id);
+    const sanitizedProvinceId = sanitizeInt(province_id);
+    const sanitizedDistrictId = sanitizeInt(district_id);
+    const sanitizedAreaId = sanitizeInt(area_id);
+    const sanitizedBedrooms = sanitizeInt(bedrooms);
+    const sanitizedBathrooms = sanitizeInt(bathrooms);
+
+    // Parse facilities to ensure it's a proper JSON array/object
+    let parsedFacilities = facilities;
+    if (facilities !== undefined && facilities !== null) {
+      if (typeof facilities === 'string') {
+        try {
+          parsedFacilities = JSON.parse(facilities);
+        } catch (e) {
+          parsedFacilities = null; // Set to null if parse fails
+        }
+      }
+    }
+
     // Check if owner exists (if provided)
-    if (owner_person_id) {
-      const owner = await Person.findByPk(owner_person_id, { transaction });
+    if (sanitizedOwnerId) {
+      const owner = await Person.findByPk(sanitizedOwnerId, { transaction });
       if (!owner) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Owner (Person) not found' });
@@ -62,29 +92,34 @@ const createProperty = async (req, res) => {
     }
 
     // Validate required fields for standalone property
-    if (!province_id || !district_id || !address) {
+    if (!sanitizedProvinceId || !sanitizedDistrictId || !address) {
       await transaction.rollback();
       return res.status(400).json({ error: 'Province, District, and Address are required for standalone properties' });
     }
 
+    // Standalone properties: category='normal', record_kind='listing', is_parent=0, parent_property_id=NULL
+    // Enforce standalone property rules per requirements
     const property = await Property.create({
-      owner_person_id: owner_person_id || null,
-      agent_id: agent_id || null,
+      owner_person_id: sanitizedOwnerId,
+      agent_id: sanitizedAgentId,
       created_by_user_id: req.user ? req.user.user_id : null,
-      property_category: 'normal', // Force property_category to normal for standalone listings
-      record_kind: 'listing', // Force record_kind to listing for standard property endpoint
+      property_category: 'normal', // Standalone properties are ALWAYS 'normal' (enforced)
+      record_kind: 'listing', // Standalone properties are listings, not containers (enforced)
+      is_parent: false, // Standalone properties are NOT parent containers (is_parent=0, enforced)
+      parent_property_id: null, // Standalone properties have NO parent (enforced)
+      parent_id: null, // Standalone properties have NO parent (enforced)
       property_type,
       purpose,
       sale_price: sale_price || null,
       rent_price: rent_price || null,
       address,
-      province_id: province_id || null,
-      district_id: district_id || null,
-      area_id: area_id || null,
+      province_id: sanitizedProvinceId,
+      district_id: sanitizedDistrictId,
+      area_id: sanitizedAreaId,
       city,
       area_size,
-      bedrooms,
-      bathrooms,
+      bedrooms: sanitizedBedrooms,
+      bathrooms: sanitizedBathrooms,
       description,
       latitude: latitude || null,
       longitude: longitude || null,
@@ -94,11 +129,9 @@ const createProperty = async (req, res) => {
       floor,
       is_available_for_sale: !!is_available_for_sale,
       is_available_for_rent: !!is_available_for_rent,
-      facilities: facilities || null,
+      facilities: parsedFacilities || null,
       details: details || {},
       photos: photos || [],
-      parent_id: null, // Force parent_id to null for standalone listings
-      is_parent: false
     }, { transaction });
 
     await transaction.commit();
@@ -132,8 +165,8 @@ const getProperties = async (req, res) => {
       order: [['createdAt', 'DESC']],
       include: [
         { model: Person, as: 'Owner', attributes: ['id', 'full_name', 'phone'] },
-        { model: User, as: 'Agent', attributes: ['user_id', 'full_name', 'phone', 'profile_picture'] },
-        { model: User, as: 'Creator', attributes: ['user_id', 'full_name', 'phone', 'profile_picture'] },
+        { model: User, as: 'Agent', attributes: ['user_id', 'full_name', 'phone', 'profile_picture', 'role'] },
+        { model: User, as: 'Creator', attributes: ['user_id', 'full_name', 'phone', 'profile_picture', 'role'] },
         { model: Province, as: 'ProvinceData', attributes: ['id', 'name'] },
         { model: District, as: 'DistrictData', attributes: ['id', 'name'] },
         { model: Area, as: 'AreaData', attributes: ['id', 'name'] },
@@ -164,17 +197,23 @@ const getPropertyById = async (req, res) => {
     const property = await Property.findByPk(id, {
       include: [
         { model: Person, as: 'Owner', attributes: ['id', 'full_name', 'phone', 'email', 'address'] },
-        { model: User, as: 'Agent', attributes: ['user_id', 'full_name', 'phone', 'email', 'profile_picture'] },
-        { model: User, as: 'Creator', attributes: ['user_id', 'full_name', 'phone', 'email', 'profile_picture'] },
+        { model: User, as: 'Agent', attributes: ['user_id', 'full_name', 'phone', 'email', 'profile_picture', 'role'] },
+        { model: User, as: 'Creator', attributes: ['user_id', 'full_name', 'phone', 'email', 'profile_picture', 'role'] },
         { model: Province, as: 'ProvinceData', attributes: ['id', 'name'] },
         { model: District, as: 'DistrictData', attributes: ['id', 'name'] },
         { model: Area, as: 'AreaData', attributes: ['id', 'name'] },
         { model: Property, as: 'Parent', attributes: ['property_id', 'title', 'property_type', 'address'] },
+        { 
+          model: Property, 
+          as: 'Children', 
+          attributes: ['property_id', 'status', 'purpose'],
+          required: false
+        },
       ],
     });
 
-    if (!property || property.record_kind !== 'listing') {
-      return res.status(404).json({ error: 'Listing not found' });
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
     }
 
     // Check visibility/permissions
@@ -186,6 +225,13 @@ const getPropertyById = async (req, res) => {
     }
 
     const propJson = property.toJSON();
+    
+    // Calculate children counts for containers
+    if (propJson.Children && propJson.Children.length > 0) {
+      propJson.total_children = propJson.Children.length;
+      propJson.available_children = propJson.Children.filter(c => c.status === 'active').length;
+    }
+    
     const enrichedProperty = {
       ...propJson,
       id: propJson.property_id,
@@ -216,14 +262,22 @@ const searchProperties = async (req, res) => {
       district_id,
       area_id,
       parent_id,
+      record_kind,
+      property_category,
       search,
       limit, 
       offset 
     } = req.query;
 
-    const andCriteria = [
-      { record_kind: 'listing' } 
-    ];
+    const andCriteria = [];
+    if (record_kind) {
+      andCriteria.push({ record_kind });
+    } else {
+      // Default to listings if no specific kind requested
+      andCriteria.push({ record_kind: 'listing' });
+    }
+
+    if (property_category) andCriteria.push({ property_category });
 
     if (search) {
       andCriteria.push({
@@ -292,8 +346,8 @@ const searchProperties = async (req, res) => {
       order: [['createdAt', 'DESC']],
       include: [
         { model: Person, as: 'Owner', attributes: ['id', 'full_name', 'phone'] },
-        { model: User, as: 'Agent', attributes: ['user_id', 'full_name', 'phone', 'profile_picture'] },
-        { model: User, as: 'Creator', attributes: ['user_id', 'full_name', 'profile_picture'] },
+        { model: User, as: 'Agent', attributes: ['user_id', 'full_name', 'phone', 'profile_picture', 'role'] },
+        { model: User, as: 'Creator', attributes: ['user_id', 'full_name', 'phone', 'profile_picture', 'role'] },
         { model: Province, as: 'ProvinceData', attributes: ['id', 'name'] },
         { model: District, as: 'DistrictData', attributes: ['id', 'name'] },
         { model: Area, as: 'AreaData', attributes: ['id', 'name'] },
@@ -321,6 +375,11 @@ const searchProperties = async (req, res) => {
 const updateProperty = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('========== UPDATE PROPERTY ==========');
+    console.log('Property ID:', id);
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('User:', req.user?.user_id, req.user?.role);
+    
     const { 
       owner_person_id, 
       agent_id, 
@@ -350,21 +409,45 @@ const updateProperty = async (req, res) => {
     } = req.body;
 
     const property = await Property.findByPk(id);
+    console.log('Property found:', property ? 'Yes' : 'No');
     if (!property || property.record_kind !== 'listing') {
+      console.log('ERROR: Property not found or not a listing');
       return res.status(404).json({ error: 'Listing not found' });
     }
 
     // Check ownership
     if (req.user && req.user.user_id !== property.created_by_user_id && req.user.role !== 'admin') {
+      console.log('ERROR: Not authorized to update');
       return res.status(403).json({ error: 'Not authorized to update this property' });
     }
 
     const isChild = !!property.parent_id;
     const isTowerUnit = isChild && property.property_category === 'tower';
 
+    // Sanitize integer fields to handle empty strings
+    const sanitizedOwnerId = sanitizeInt(owner_person_id);
+    const sanitizedAgentId = sanitizeInt(agent_id);
+    const sanitizedProvinceId = sanitizeInt(province_id);
+    const sanitizedDistrictId = sanitizeInt(district_id);
+    const sanitizedAreaId = sanitizeInt(area_id);
+    const sanitizedBedrooms = sanitizeInt(bedrooms);
+    const sanitizedBathrooms = sanitizeInt(bathrooms);
+
+    // Parse facilities to ensure it's a proper JSON array/object
+    let parsedFacilities = facilities;
+    if (facilities !== undefined) {
+      if (typeof facilities === 'string') {
+        try {
+          parsedFacilities = JSON.parse(facilities);
+        } catch (e) {
+          parsedFacilities = facilities; // Keep as string if parse fails
+        }
+      }
+    }
+
     const updateData = {
-      owner_person_id: owner_person_id !== undefined ? owner_person_id : property.owner_person_id,
-      agent_id: agent_id !== undefined ? agent_id : property.agent_id,
+      owner_person_id: sanitizedOwnerId !== undefined ? sanitizedOwnerId : property.owner_person_id,
+      agent_id: sanitizedAgentId !== undefined ? sanitizedAgentId : property.agent_id,
       property_type: property_type !== undefined ? property_type : property.property_type,
       purpose: purpose !== undefined ? purpose : property.purpose,
       title: title !== undefined ? title : property.title,
@@ -377,41 +460,52 @@ const updateProperty = async (req, res) => {
       area_size: area_size !== undefined ? area_size : property.area_size,
       description: description !== undefined ? description : property.description,
       details: details !== undefined ? details : property.details,
-      status: status !== undefined ? status : property.status
+      status: status !== undefined ? status : property.status,
+      facilities: parsedFacilities !== undefined ? parsedFacilities : property.facilities
     };
 
-    // Only update these if NOT a child listing (child listings inherit these)
+    // Only update these if NOT a child listing (child listings inherit these from parent)
     if (!isChild) {
       updateData.address = address !== undefined ? address : property.address;
-      updateData.province_id = province_id !== undefined ? province_id : property.province_id;
-      updateData.district_id = district_id !== undefined ? district_id : property.district_id;
-      updateData.area_id = area_id !== undefined ? area_id : property.area_id;
+      updateData.province_id = sanitizedProvinceId !== undefined ? sanitizedProvinceId : property.province_id;
+      updateData.district_id = sanitizedDistrictId !== undefined ? sanitizedDistrictId : property.district_id;
+      updateData.area_id = sanitizedAreaId !== undefined ? sanitizedAreaId : property.area_id;
       updateData.city = city !== undefined ? city : property.city;
       updateData.latitude = latitude !== undefined ? latitude : property.latitude;
       updateData.longitude = longitude !== undefined ? longitude : property.longitude;
-      updateData.facilities = facilities !== undefined ? facilities : property.facilities;
     }
 
     // Handle Bedrooms/Bathrooms based on Tower rules
     if (isTowerUnit) {
       const activeType = property_type || property.property_type;
       if (activeType === 'apartment') {
-        updateData.bedrooms = bedrooms !== undefined ? bedrooms : property.bedrooms;
-        updateData.bathrooms = bathrooms !== undefined ? bathrooms : property.bathrooms;
+        updateData.bedrooms = sanitizedBedrooms !== undefined ? sanitizedBedrooms : property.bedrooms;
+        updateData.bathrooms = sanitizedBathrooms !== undefined ? sanitizedBathrooms : property.bathrooms;
       } else {
         // Force null for Office/Shop in Towers
         updateData.bedrooms = null;
         updateData.bathrooms = null;
       }
     } else {
-      updateData.bedrooms = bedrooms !== undefined ? bedrooms : property.bedrooms;
-      updateData.bathrooms = bathrooms !== undefined ? bathrooms : property.bathrooms;
+      updateData.bedrooms = sanitizedBedrooms !== undefined ? sanitizedBedrooms : property.bedrooms;
+      updateData.bathrooms = sanitizedBathrooms !== undefined ? sanitizedBathrooms : property.bathrooms;
     }
 
+    console.log('Update data:', JSON.stringify(updateData, null, 2));
     await property.update(updateData);
 
+    console.log('✓ Property updated successfully');
+    console.log('========== UPDATE PROPERTY COMPLETE ==========');
     res.json({ message: 'Property updated successfully' });
   } catch (error) {
+    console.error('========== ERROR UPDATE PROPERTY ==========');
+    console.error('Error details:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    if (error.name === 'SequelizeValidationError') {
+      console.error('Validation errors:', error.errors.map(e => e.message));
+      return res.status(400).json({ error: error.errors.map(e => e.message) });
+    }
     res.status(500).json({ error: error.message });
   }
 };
@@ -454,8 +548,8 @@ const getMyProperties = async (req, res) => {
       },
       include: [
         { model: Person, as: 'Owner', attributes: ['id', 'full_name', 'phone'] },
-        { model: User, as: 'Agent', attributes: ['user_id', 'full_name', 'phone', 'profile_picture'] },
-        { model: User, as: 'Creator', attributes: ['user_id', 'full_name', 'phone', 'profile_picture'] },
+        { model: User, as: 'Agent', attributes: ['user_id', 'full_name', 'phone', 'profile_picture', 'role'] },
+        { model: User, as: 'Creator', attributes: ['user_id', 'full_name', 'phone', 'profile_picture', 'role'] },
       ],
     });
     res.json(properties.map(p => ({ ...p.toJSON(), id: p.property_id })));
@@ -550,22 +644,44 @@ const getPublicPropertiesByUser = async (req, res) => {
     const { limit, offset } = req.query;
     const properties = await Property.findAll({
       where: {
-        record_kind: 'listing',
         status: 'active',
         [Op.or]: [
           { agent_id: id },
           { created_by_user_id: id }
         ]
       },
-      limit: limit ? parseInt(limit) : 10,
+      limit: limit ? parseInt(limit) : 100,
       offset: offset ? parseInt(offset) : 0,
       order: [['createdAt', 'DESC']],
       include: [
         { model: Province, as: 'ProvinceData', attributes: ['name'] },
         { model: District, as: 'DistrictData', attributes: ['name'] },
+        { model: Area, as: 'AreaData', attributes: ['name'] },
+        { 
+          model: Property, 
+          as: 'Children', 
+          attributes: ['property_id', 'status'],
+          required: false
+        },
       ],
     });
-    res.json(properties.map(p => ({ ...p.toJSON(), id: p.property_id })));
+    
+    // Enrich container properties with children counts
+    const enrichedProperties = properties.map(p => {
+      const prop = p.toJSON();
+      prop.id = prop.property_id;
+      
+      // Calculate children counts for containers
+      if (prop.Children && prop.Children.length > 0) {
+        prop.total_children = prop.Children.length;
+        prop.available_children = prop.Children.filter(c => c.status === 'active').length;
+        delete prop.Children;
+      }
+      
+      return prop;
+    });
+    
+    res.json(enrichedProperties);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

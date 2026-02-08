@@ -54,7 +54,7 @@ export const AnimatedFormInput: React.FC<AnimatedFormInputProps> = ({
     return {
       borderColor: error && touched ? theme.danger : borderColor,
       borderWidth: isFocused || (error && touched) ? 2 : 1.5,
-      backgroundColor: isFocused ? theme.card : theme.card + '80',
+      backgroundColor: 'transparent',
     };
   });
 

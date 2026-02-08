@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 class ThemeStore {
-  theme: ThemeMode = 'system';
+  theme: ThemeMode = 'light';
   isReady = false;
 
   constructor() {
@@ -16,7 +16,7 @@ class ThemeStore {
     try {
       const stored = await SecureStore.getItemAsync('theme');
       runInAction(() => {
-        this.theme = (stored as ThemeMode) || 'system';
+        this.theme = (stored as ThemeMode) || 'light';
         this.isReady = true;
       });
     } catch (error) {

@@ -128,6 +128,7 @@ const PropertiesScreen = observer(() => {
   const insets = useSafeAreaInsets();
   const [showFilters, setShowFilters] = useState(false);
   const [agents, setAgents] = useState([]);
+  const [viewMode, setViewMode] = useState<'default' | 'horizontal'>('default');
   
   const [filters, setFilters] = useState({
     city: (params.city as string) || '',
@@ -138,6 +139,8 @@ const PropertiesScreen = observer(() => {
     district_name: (params.district_name as string) || '',
     area_name: (params.area_name as string) || '',
     property_type: '',
+    record_kind: '',
+    property_category: '',
     purpose: params.type === 'Rent/PG' ? 'rent' : params.type === 'Buy' ? 'sale' : '',
     min_price: '',
     max_price: '',
@@ -256,6 +259,8 @@ const PropertiesScreen = observer(() => {
       district_name: '',
       area_name: '',
       property_type: '',
+      record_kind: '',
+      property_category: '',
       purpose: '',
       min_price: '',
       max_price: '',
@@ -303,12 +308,12 @@ const PropertiesScreen = observer(() => {
             <View style={styles.listHeader}>
               <View style={[styles.premiumSearchHeader, { paddingHorizontal: 0 }]}>
                 <TouchableOpacity 
-                  style={[styles.premiumSearchBar, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+                  style={[styles.premiumSearchBar, { backgroundColor: '#fff', borderColor: '#e0e0e0' }]}
                   activeOpacity={0.9}
                   onPress={() => router.push('/search')}
                 >
-                  <Ionicons name="search-outline" size={20} color={themeColors.subtext} />
-                  <Text style={[styles.premiumSearchText, { color: themeColors.subtext }]} numberOfLines={1}>
+                  <Ionicons name="search-outline" size={18} color="#999" />
+                  <Text style={[styles.premiumSearchText, { color: '#999' }]} numberOfLines={1}>
                     {filters.area_name ? (
                       `${filters.province_name} > ${filters.district_name} > ${filters.area_name}`
                     ) : filters.district_name ? (
@@ -327,7 +332,7 @@ const PropertiesScreen = observer(() => {
                       }}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                      <Ionicons name="close-circle" size={20} color={themeColors.subtext} />
+                      <Ionicons name="close-circle" size={20} color="#999" />
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
@@ -336,7 +341,22 @@ const PropertiesScreen = observer(() => {
                   style={[styles.premiumFilterBtn, { backgroundColor: themeColors.primary }]} 
                   onPress={() => setShowFilters(true)}
                 >
-                  <Ionicons name="options-outline" size={24} color="#fff" />
+                  <Text style={styles.filterBtnText}>Filters</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.viewToggleBtn, { backgroundColor: '#fff', borderColor: '#e0e0e0' }]} 
+                  onPress={() => {
+                    const newMode = viewMode === 'default' ? 'horizontal' : 'default';
+                    setViewMode(newMode);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={viewMode === 'default' ? 'list-outline' : 'grid-outline'} 
+                    size={22} 
+                    color={themeColors.text} 
+                  />
                 </TouchableOpacity>
               </View>
               
@@ -347,20 +367,57 @@ const PropertiesScreen = observer(() => {
                 contentContainerStyle={styles.premiumCategoryContainer}
               >
                 {[
-                  { name: 'Home', value: 'house', icon: 'home-variant-outline' },
-                  { name: 'Apartment', value: 'apartment', icon: 'office-building-outline' },
-                  { name: 'Land', value: 'land', icon: 'map-outline' },
-                  { name: 'Shop', value: 'shop', icon: 'store-outline' },
+                  { name: 'All', type: 'all', icon: 'apps' },
+                  { name: 'Home', type: 'property_type', value: 'house', icon: 'home-variant-outline' },
+                  { name: 'Apartment', type: 'property_type', value: 'apartment', icon: 'office-building-outline' },
+                  { name: 'Land', type: 'property_type', value: 'land', icon: 'map-outline' },
+                  { name: 'Shop', type: 'property_type', value: 'shop', icon: 'store-outline' },
+                  { name: 'Towers', type: 'property_category', value: 'tower', icon: 'city-variant-outline' },
+                  { name: 'Markets', type: 'property_category', value: 'market', icon: 'store' },
+                  { name: 'Sharaks', type: 'property_category', value: 'sharak', icon: 'home-group' },
                 ].map((cat) => {
-                  const isActive = filters.property_type === cat.value;
+                  let isActive = false;
+                  if (cat.type === 'all') {
+                    isActive = !filters.property_type && !filters.property_category;
+                  } else if (cat.type === 'property_type') {
+                    isActive = filters.property_type === cat.value;
+                  } else if (cat.type === 'property_category') {
+                    isActive = filters.property_category === cat.value;
+                  }
+
                   return (
                     <TouchableOpacity 
                       key={cat.name} 
-                      onPress={() => updateFilter('property_type', isActive ? '' : cat.value)}
+                      onPress={() => {
+                        if (cat.type === 'all') {
+                          setFilters(prev => ({ 
+                            ...prev, 
+                            property_type: '', 
+                            record_kind: '', 
+                            property_category: '',
+                            purpose: '' // Clear purpose when showing all
+                          }));
+                        } else if (cat.type === 'property_type') {
+                          setFilters(prev => ({ 
+                            ...prev, 
+                            property_type: isActive ? '' : cat.value, 
+                            record_kind: '', 
+                            property_category: '' 
+                          }));
+                        } else if (cat.type === 'property_category') {
+                          setFilters(prev => ({ 
+                            ...prev, 
+                            property_type: '', 
+                            record_kind: isActive ? '' : 'container', 
+                            property_category: isActive ? '' : cat.value,
+                            purpose: '' // Clear purpose for containers as they don't have one
+                          }));
+                        }
+                      }}
                       style={[
                         styles.premiumCategoryChip, 
-                        { backgroundColor: themeColors.card, borderColor: themeColors.border },
-                        isActive && { backgroundColor: themeColors.primary, borderColor: themeColors.primary }
+                        { backgroundColor: '#fff' },
+                        isActive && { backgroundColor: themeColors.primary }
                       ]}
                     >
                       <MaterialCommunityIcons 
@@ -384,7 +441,16 @@ const PropertiesScreen = observer(() => {
               <PropertyCard
                 property={item}
                 index={index}
-                onPress={() => router.push(`/property/${item.property_id}`)}
+                variant={viewMode}
+                onPress={() => {
+                  if (item.record_kind === 'container') {
+                    // Navigate to parent profile page based on category
+                    const category = item.property_category || 'tower';
+                    router.push(`/parent/${category}/${item.property_id}`);
+                  } else {
+                    router.push(`/property/${item.property_id}`);
+                  }
+                }}
               />
             </View>
           )}
@@ -429,6 +495,7 @@ const PropertiesScreen = observer(() => {
               setTempFilters({
                 ...tempFilters,
                 property_type: '',
+                property_category: '',
                 purpose: '',
                 min_price: '',
                 max_price: '',
@@ -444,13 +511,13 @@ const PropertiesScreen = observer(() => {
             <View style={styles.filterSection}>
               <Text style={[styles.filterLabel, { color: themeColors.text }]}>Property Type</Text>
               <View style={styles.chipGrid}>
-                {['House', 'Apartment', 'Villa', 'Commercial', 'Land'].map((type) => (
+                {['House', 'Apartment', 'Land', 'Shop', 'Office'].map((type) => (
                   <TouchableOpacity
                     key={type}
                     style={[
                       styles.filterChip, 
-                      { backgroundColor: themeColors.card, borderColor: themeColors.border },
-                      tempFilters.property_type === type && { backgroundColor: themeColors.primary, borderColor: themeColors.primary }
+                      { backgroundColor: themeColors.card },
+                      tempFilters.property_type === type && { backgroundColor: themeColors.primary }
                     ]}
                     onPress={() => updateTempFilter('property_type', tempFilters.property_type === type ? '' : type)}
                   >
@@ -459,6 +526,33 @@ const PropertiesScreen = observer(() => {
                       { color: themeColors.text },
                       tempFilters.property_type === type && { color: '#fff' }
                     ]}>{type}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text style={[styles.filterLabel, { color: themeColors.text }]}>Building Categories</Text>
+              <View style={styles.chipGrid}>
+                {[
+                  { label: 'Towers', value: 'tower' },
+                  { label: 'Markets', value: 'market' },
+                  { label: 'Sharaks', value: 'sharak' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={[
+                      styles.filterChip, 
+                      { backgroundColor: themeColors.card },
+                      tempFilters.property_category === item.value && { backgroundColor: themeColors.primary }
+                    ]}
+                    onPress={() => updateTempFilter('property_category', tempFilters.property_category === item.value ? '' : item.value)}
+                  >
+                    <Text style={[
+                      styles.filterChipText, 
+                      { color: themeColors.text },
+                      tempFilters.property_category === item.value && { color: '#fff' }
+                    ]}>{item.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -476,8 +570,8 @@ const PropertiesScreen = observer(() => {
                     key={item.value}
                     style={[
                       styles.filterChip, 
-                      { backgroundColor: themeColors.card, borderColor: themeColors.border },
-                      tempFilters.purpose === item.value && { backgroundColor: themeColors.primary, borderColor: themeColors.primary }
+                      { backgroundColor: themeColors.card },
+                      tempFilters.purpose === item.value && { backgroundColor: themeColors.primary }
                     ]}
                     onPress={() => updateTempFilter('purpose', tempFilters.purpose === item.value ? '' : item.value)}
                   >
@@ -511,8 +605,8 @@ const PropertiesScreen = observer(() => {
                     key={num}
                     style={[
                       styles.filterChip, 
-                      { backgroundColor: themeColors.card, borderColor: themeColors.border },
-                      tempFilters.bedrooms === num.replace('+', '') && { backgroundColor: themeColors.primary, borderColor: themeColors.primary }
+                      { backgroundColor: themeColors.card },
+                      tempFilters.bedrooms === num.replace('+', '') && { backgroundColor: themeColors.primary }
                     ]}
                     onPress={() => updateTempFilter('bedrooms', tempFilters.bedrooms === num.replace('+', '') ? '' : num.replace('+', ''))}
                   >
@@ -526,17 +620,17 @@ const PropertiesScreen = observer(() => {
               </View>
             </View>
 
-            {agents.length > 0 && (
+            {agents.filter((agent: any) => agent.role !== 'admin').length > 0 && (
               <View style={styles.filterSection}>
                 <Text style={[styles.filterLabel, { color: themeColors.text }]}>Agent</Text>
                 <View style={styles.chipGrid}>
-                  {agents.map((agent: any) => (
+                  {agents.filter((agent: any) => agent.role !== 'admin').map((agent: any) => (
                     <TouchableOpacity
                       key={agent.user_id}
                       style={[
                         styles.filterChip, 
-                        { backgroundColor: themeColors.card, borderColor: themeColors.border },
-                        tempFilters.agent_id === String(agent.user_id) && { backgroundColor: themeColors.primary, borderColor: themeColors.primary }
+                        { backgroundColor: themeColors.card },
+                        tempFilters.agent_id === String(agent.user_id) && { backgroundColor: themeColors.primary }
                       ]}
                       onPress={() => updateTempFilter('agent_id', tempFilters.agent_id === String(agent.user_id) ? '' : String(agent.user_id))}
                     >
@@ -579,18 +673,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
   premiumSearchText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 13,
     marginLeft: 10,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   premiumFilterBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    height: 42,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -598,6 +692,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+  },
+  filterBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  viewToggleBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
   },
   errorBox: {
     marginHorizontal: 20,
@@ -645,7 +752,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 18,
-    borderWidth: 1.5,
+    borderWidth: 0,
   },
   premiumCategoryText: {
     fontSize: 14,
@@ -723,28 +830,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   filterSection: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   filterLabel: {
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 16,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 12,
     letterSpacing: -0.2,
   },
   chipGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   filterChip: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    borderRadius: 14,
+    borderWidth: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   filterChipText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
   },
   sliderWrapper: {
     height: 100,
